@@ -99,17 +99,19 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
   });
 
   const markSent = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (inv: { id: string; invoice_number: string }) => {
       const { error } = await supabase
         .from("invoices")
         .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", inv.id);
       if (error) throw error;
+      return inv;
     },
-    onSuccess: () => {
+    onSuccess: (inv) => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("تم نقل الفاتورة إلى تبويب «تم الإرسال»");
       logActivity({ module: "invoices", action: "mark_sent", description: "وضع فاتورة كمُرسلة" });
+      notify("invoice_sent", `تم إرسال الفاتورة رقم ${inv.invoice_number}.`);
     },
     onError: (e: Error) => toast.error("تعذر تحديث الحالة: " + e.message),
   });
