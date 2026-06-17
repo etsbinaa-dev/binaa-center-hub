@@ -27,6 +27,7 @@ import {
   Trash2,
   Pencil,
   AlertTriangle,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -194,9 +195,55 @@ function InvoiceCard({
 }) {
   const thumb = useSignedUrl(invoice.image_path);
 
-  const waLink = `https://wa.me/${invoice.customer_phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(
-    `مرحباً ${invoice.customer_name}، فاتورتك رقم ${invoice.invoice_number}`,
-  )}`;
+  const phoneDigits = invoice.customer_phone.replace(/[^\d]/g, "");
+  const waLink = `https://wa.me/${phoneDigits}`;
+
+  async function copyImage(): Promise<boolean> {
+    if (!invoice.image_path) return false;
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(invoice.image_path, 300);
+      if (error || !data?.signedUrl) throw error ?? new Error("no url");
+      const res = await fetch(data.signedUrl);
+      const blob = await res.blob();
+      const ClipItem = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (!ClipItem || !navigator.clipboard?.write) return false;
+      // Some browsers only allow image/png in clipboard
+      let finalBlob = blob;
+      if (blob.type !== "image/png") {
+        try {
+          finalBlob = await convertToPng(blob);
+        } catch {
+          finalBlob = blob;
+        }
+      }
+      await navigator.clipboard.write([new ClipItem({ [finalBlob.type]: finalBlob })]);
+      return true;
+    } catch (e) {
+      console.warn("[invoice] copy image failed", e);
+      return false;
+    }
+  }
+
+  async function handleWhatsApp() {
+    if (!phoneDigits) {
+      toast.error("لا يوجد رقم واتساب لهذا العميل");
+      return;
+    }
+    if (invoice.image_path) {
+      const ok = await copyImage();
+      if (ok) toast.success("تم نسخ صورة الفاتورة — الصقها داخل واتساب");
+      else toast.message("افتح المحادثة ثم اضغط «نسخ الصورة» للصقها يدوياً");
+    }
+    window.open(waLink, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleCopyImage() {
+    const ok = await copyImage();
+    if (ok) toast.success("تم نسخ صورة الفاتورة إلى الحافظة");
+    else toast.error("المتصفح لا يدعم نسخ الصور إلى الحافظة");
+  }
 
   return (
     <Card className="flex flex-col gap-3 p-3">
@@ -250,12 +297,16 @@ function InvoiceCard({
           <Pencil className="h-4 w-4" />
           تعديل
         </Button>
-        <Button size="sm" variant="outline" asChild className="gap-1.5">
-          <a href={waLink} target="_blank" rel="noreferrer">
-            <Send className="h-4 w-4" />
-            واتساب
-          </a>
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={handleWhatsApp}>
+          <Send className="h-4 w-4" />
+          واتساب
         </Button>
+        {invoice.image_path && (
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCopyImage}>
+            <Copy className="h-4 w-4" />
+            نسخ الصورة
+          </Button>
+        )}
         {invoice.status === "new" ? (
           <Button size="sm" className="gap-1.5" onClick={onMarkSent}>
             <CheckCircle2 className="h-4 w-4" />
