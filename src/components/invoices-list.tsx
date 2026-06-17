@@ -25,6 +25,8 @@ import {
   Receipt,
   ImageOff,
   Trash2,
+  Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -47,6 +49,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
   const [search, setSearch] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [viewing, setViewing] = useState<Invoice | null>(null);
+  const [editing, setEditing] = useState<Invoice | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["invoices", status, search],
@@ -152,6 +155,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
               key={inv.id}
               invoice={inv}
               onView={() => setViewing(inv)}
+              onEdit={() => setEditing(inv)}
               onMarkSent={() => markSent.mutate(inv.id)}
               onMarkNew={() => markNew.mutate(inv.id)}
               onDelete={() => remove.mutate(inv)}
@@ -163,6 +167,10 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
 
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <ViewDialog invoice={viewing} onOpenChange={(o) => !o && setViewing(null)} />
+      <EditDialog
+        invoice={editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+      />
     </div>
   );
 }
@@ -170,6 +178,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
 function InvoiceCard({
   invoice,
   onView,
+  onEdit,
   onMarkSent,
   onMarkNew,
   onDelete,
@@ -177,6 +186,7 @@ function InvoiceCard({
 }: {
   invoice: Invoice;
   onView: () => void;
+  onEdit: () => void;
   onMarkSent: () => void;
   onMarkNew: () => void;
   onDelete: () => void;
@@ -215,10 +225,15 @@ function InvoiceCard({
       </div>
 
       <div className="space-y-1">
-        <div className="font-bold leading-tight">{invoice.customer_name}</div>
+        <div className="flex items-center gap-1.5 font-bold leading-tight">
+          {invoice.customer_name === "غير معروف" && (
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          )}
+          {invoice.customer_name}
+        </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Phone className="h-3.5 w-3.5" />
-          <span dir="ltr">{invoice.customer_phone}</span>
+          <span dir="ltr">{invoice.customer_phone || "—"}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Receipt className="h-3.5 w-3.5" />
@@ -230,6 +245,10 @@ function InvoiceCard({
         <Button size="sm" variant="outline" className="gap-1.5" onClick={onView}>
           <Eye className="h-4 w-4" />
           عرض
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+          تعديل
         </Button>
         <Button size="sm" variant="outline" asChild className="gap-1.5">
           <a href={waLink} target="_blank" rel="noreferrer">
