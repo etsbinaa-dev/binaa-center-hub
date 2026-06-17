@@ -20,7 +20,7 @@ import {
   Upload,
   Eye,
   Send,
-  CheckCircle2,
+  
   Phone,
   Receipt,
   ImageOff,
