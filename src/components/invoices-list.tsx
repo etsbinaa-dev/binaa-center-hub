@@ -412,10 +412,6 @@ function ImportDialog({
   const qc = useQueryClient();
   const extract = useServerFn(extractInvoiceFields);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [file, setFile] = useState<File | null>(null);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -439,10 +435,6 @@ function ImportDialog({
   }
 
   function reset() {
-    setCustomerName("");
-    setCustomerPhone("");
-    setInvoiceNumber("");
-    setFile(null);
     setBulkFiles([]);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -458,35 +450,6 @@ function ImportDialog({
     return path;
   }
 
-  async function handleSingle() {
-    if (!customerName.trim() || !customerPhone.trim() || !invoiceNumber.trim()) {
-      toast.error("يرجى تعبئة اسم العميل ورقم الهاتف ورقم الفاتورة");
-      return;
-    }
-    setBusy(true);
-    try {
-      let image_path: string | null = null;
-      if (file) image_path = await uploadFile(file);
-      const { error } = await supabase.from("invoices").insert({
-        customer_name: customerName.trim(),
-        customer_phone: customerPhone.trim(),
-        invoice_number: invoiceNumber.trim(),
-        image_path,
-        status: "new",
-        created_by: user?.id ?? null,
-      });
-      if (error) throw error;
-      toast.success("تم إضافة الفاتورة");
-      qc.invalidateQueries({ queryKey: ["invoices"] });
-      reset();
-      onOpenChange(false);
-    } catch (e) {
-      toast.error("تعذر الحفظ: " + (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleBulk() {
     if (bulkFiles.length === 0) return;
     setBusy(true);
@@ -499,9 +462,7 @@ function ImportDialog({
         let customer_name = "غير معروف";
         let customer_phone = "";
         let invoice_number = fallbackInv;
-        let extractionFailed = false;
 
-        // 1) Try OCR/extraction — never let it block the rest of the import
         try {
           const extracted = await extractFromFile(f);
           console.debug("[invoice-extract] OCR raw text for", f.name, "\n", extracted.raw_text);
@@ -521,12 +482,10 @@ function ImportDialog({
             toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
           }
         } catch (e) {
-          extractionFailed = true;
           console.error("[invoice-extract] OCR failed for", f.name, e);
           toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
         }
 
-        // 2) Always try to save the invoice, even when extraction failed
         try {
           const path = await uploadFile(f);
           const { error } = await supabase.from("invoices").insert({
@@ -544,8 +503,6 @@ function ImportDialog({
           console.error("[invoice-extract] save failed", f.name, e);
           toast.error(`${f.name}: تعذر حفظ الفاتورة`);
         }
-
-        void extractionFailed;
       }
 
       if (ok > 0) toast.success(`تم استيراد ${ok} فاتورة`);
@@ -579,62 +536,20 @@ function ImportDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <section className="space-y-3 rounded-lg border border-border p-3">
-            <div className="text-sm font-bold">فاتورة واحدة</div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label>اسم العميل</Label>
-                <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>رقم الواتساب</Label>
-                <Input
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  inputMode="tel"
-                  dir="ltr"
-                />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label>رقم الفاتورة</Label>
-                <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label>صورة الفاتورة (اختياري)</Label>
-                <Input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
-            </div>
-            <Button onClick={handleSingle} disabled={busy} className="w-full">
-              {busy ? "جارٍ الحفظ…" : "حفظ الفاتورة"}
-            </Button>
-          </section>
-
-          <section className="space-y-3 rounded-lg border border-dashed border-border p-3">
-            <div className="text-sm font-bold">استيراد متعدد من الصور</div>
-            <p className="text-xs text-muted-foreground">
-              اختر مجموعة صور للفواتير. سيتم استخدام اسم الملف كرقم الفاتورة ويمكنك تعديل بيانات
-              العميل لاحقاً.
-            </p>
-            <Input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setBulkFiles(Array.from(e.target.files ?? []))}
-            />
-            <Button
-              onClick={handleBulk}
-              disabled={busy || bulkFiles.length === 0}
-              variant="secondary"
-              className="w-full"
-            >
-              {busy ? "جارٍ الاستيراد…" : `استيراد ${bulkFiles.length || ""} فاتورة`}
-            </Button>
-          </section>
+          <Input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setBulkFiles(Array.from(e.target.files ?? []))}
+          />
+          <Button
+            onClick={handleBulk}
+            disabled={busy || bulkFiles.length === 0}
+            className="w-full"
+          >
+            {busy ? "جارٍ الاستيراد…" : `استيراد ${bulkFiles.length || ""} فاتورة`}
+          </Button>
         </div>
 
         <DialogFooter>
