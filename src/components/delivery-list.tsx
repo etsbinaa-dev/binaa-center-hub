@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Search, Phone, Clock, CheckCircle2, Truck, PackageCheck, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { OrderAttachmentsView } from "@/components/order-attachments-view";
+import { logActivity } from "@/lib/activity";
 
 type DeliveryStatus = "new" | "in_progress" | "delivered";
 
@@ -54,19 +55,27 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
 
   const updateDelivery = useMutation({
     mutationFn: async ({ id, next }: { id: string; next: DeliveryStatus }) => {
+      const order = orders.find((o) => o.id === id);
       const { error } = await supabase.from("orders").update({
         delivery_status: next,
         delivered_at: next === "delivered" ? new Date().toISOString() : null,
       }).eq("id", id);
       if (error) throw error;
+      return order;
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (order, vars) => {
       qc.invalidateQueries({ queryKey: ["delivery"] });
       qc.invalidateQueries({ queryKey: ["count"] });
       toast.success(
         vars.next === "delivered" ? "تم التسليم" :
         vars.next === "in_progress" ? "بدأ التوصيل" : "تم التحديث",
       );
+      const cname = order?.customers?.name ?? "—";
+      if (vars.next === "delivered") {
+        logActivity({ module: "delivery", action: "delivered", description: `تأكيد تسليم طلب العميل ${cname}` });
+      } else if (vars.next === "in_progress") {
+        logActivity({ module: "delivery", action: "start_delivery", description: `بدء توصيل طلب العميل ${cname}` });
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });
