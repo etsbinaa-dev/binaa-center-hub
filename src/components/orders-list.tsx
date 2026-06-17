@@ -263,6 +263,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [attachments, setAttachments] = useState<LocalAttachments>({ images: [], voice: null, files: [] });
+  const [contactsUnavailable, setContactsUnavailable] = useState(false);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-all"],
