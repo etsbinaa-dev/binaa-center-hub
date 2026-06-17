@@ -518,6 +518,9 @@ function ImportDialog({
           action: "import",
           description: `استيراد ${ok} فاتورة جديدة`,
         });
+        for (let i = 0; i < ok; i++) {
+          notify("invoice_new", "تمت إضافة فاتورة جديدة غير مرسلة.");
+        }
       }
       if (missing > 0) console.warn(`[invoice-extract] ${missing} invoice(s) without customer data`);
       if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
