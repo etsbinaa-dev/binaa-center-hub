@@ -61,7 +61,7 @@ function CustomersPage() {
       setOpen(false); setEditing(null);
       toast.success("تم الحفظ");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error("تعذر حفظ بيانات العميل"),
   });
 
   const del = useMutation({
@@ -72,9 +72,16 @@ function CustomersPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
-      toast.success("تم الحذف");
+      toast.success("تم حذف العميل");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => {
+      const msg = String(e?.message ?? "") + String(e?.details ?? "");
+      if (e?.code === "23503" || /foreign key|orders_customer_id_fkey/i.test(msg)) {
+        toast.error("لا يمكن حذف العميل لأنه مرتبط بطلبات موجودة.");
+      } else {
+        toast.error("تعذر حذف العميل");
+      }
+    },
   });
 
   return (
