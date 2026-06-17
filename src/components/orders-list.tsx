@@ -17,6 +17,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { sendTelegramOrderNotification } from "@/lib/telegram.functions";
 import { OrderAttachmentInput, type LocalAttachments } from "@/components/order-attachment-input";
 import { OrderAttachmentsView } from "@/components/order-attachments-view";
+import { logActivity } from "@/lib/activity";
 
 function fireTelegram(
   notify: ReturnType<typeof useServerFn<typeof sendTelegramOrderNotification>>,
@@ -123,19 +124,34 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
       qc.invalidateQueries({ queryKey: ["count", "orders"] });
       toast.success(nextStatus === "archived" ? "تم نقل الطلب إلى الأرشيف" : "تم إرجاع الطلب للنشطة");
       if (order) fireTelegram(notifyTelegram, nextStatus === "archived" ? "invoiced" : "updated", order);
+      const cname = order?.customers?.name ?? "—";
+      logActivity({
+        module: "orders",
+        action: nextStatus === "archived" ? "archive" : "restore",
+        description: nextStatus === "archived"
+          ? `أرشفة طلب العميل ${cname} (تمت الفوترة)`
+          : `استعادة طلب العميل ${cname} من الأرشيف`,
+      });
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   const del = useMutation({
     mutationFn: async (id: string) => {
+      const order = orders.find((o) => o.id === id);
       const { error } = await supabase.from("orders").delete().eq("id", id);
       if (error) throw error;
+      return order;
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["count", "orders"] });
       toast.success("تم الحذف");
+      logActivity({
+        module: "orders",
+        action: "delete",
+        description: `حذف طلب العميل ${order?.customers?.name ?? "—"}`,
+      });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -364,6 +380,13 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         details: info.details,
       });
       toast.success(initial ? "تم تحديث الطلب" : "تم إنشاء الطلب");
+      logActivity({
+        module: "orders",
+        action: initial ? "update" : "create",
+        description: initial
+          ? `تعديل طلب العميل ${info.name}`
+          : `إنشاء طلب جديد للعميل ${info.name}`,
+      });
       onDone();
     },
     onError: (e: any) => toast.error(e.message),
