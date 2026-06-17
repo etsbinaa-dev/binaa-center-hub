@@ -96,12 +96,14 @@ function CustomersPage() {
             <Button size="sm"><Plus className="h-4 w-4 ml-1" />إضافة</Button>
           </DialogTrigger>
           <CustomerDialog
+            key={editing?.id ?? "new"}
             initial={editing}
             onSubmit={(v) => save.mutate({ ...v, id: editing?.id })}
             loading={save.isPending}
           />
         </Dialog>
       </div>
+
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
