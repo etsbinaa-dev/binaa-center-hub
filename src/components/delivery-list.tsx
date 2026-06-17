@@ -54,9 +54,10 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
 
   const updateDelivery = useMutation({
     mutationFn: async ({ id, next }: { id: string; next: DeliveryStatus }) => {
-      const patch: Record<string, unknown> = { delivery_status: next };
-      patch.delivered_at = next === "delivered" ? new Date().toISOString() : null;
-      const { error } = await supabase.from("orders").update(patch).eq("id", id);
+      const { error } = await supabase.from("orders").update({
+        delivery_status: next,
+        delivered_at: next === "delivered" ? new Date().toISOString() : null,
+      }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {

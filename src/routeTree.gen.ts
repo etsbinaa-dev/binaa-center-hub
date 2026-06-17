@@ -21,6 +21,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrdersArchiveRouteImport } from './routes/orders.archive'
 import { Route as InvoicesSentRouteImport } from './routes/invoices.sent'
+import { Route as DeliveryArchiveRouteImport } from './routes/delivery.archive'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -82,18 +83,24 @@ const InvoicesSentRoute = InvoicesSentRouteImport.update({
   path: '/sent',
   getParentRoute: () => InvoicesRoute,
 } as any)
+const DeliveryArchiveRoute = DeliveryArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
+  getParentRoute: () => DeliveryRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
-  '/delivery': typeof DeliveryRoute
+  '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
+  '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
 }
@@ -101,13 +108,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
-  '/delivery': typeof DeliveryRoute
+  '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
+  '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
 }
@@ -116,13 +124,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
-  '/delivery': typeof DeliveryRoute
+  '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
+  '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
 }
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/users'
+    | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/users'
+    | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
   id:
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/users'
+    | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
   fileRoutesById: FileRoutesById
@@ -175,7 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CustomersRoute: typeof CustomersRoute
-  DeliveryRoute: typeof DeliveryRoute
+  DeliveryRoute: typeof DeliveryRouteWithChildren
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
@@ -270,8 +282,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoicesSentRouteImport
       parentRoute: typeof InvoicesRoute
     }
+    '/delivery/archive': {
+      id: '/delivery/archive'
+      path: '/archive'
+      fullPath: '/delivery/archive'
+      preLoaderRoute: typeof DeliveryArchiveRouteImport
+      parentRoute: typeof DeliveryRoute
+    }
   }
 }
+
+interface DeliveryRouteChildren {
+  DeliveryArchiveRoute: typeof DeliveryArchiveRoute
+}
+
+const DeliveryRouteChildren: DeliveryRouteChildren = {
+  DeliveryArchiveRoute: DeliveryArchiveRoute,
+}
+
+const DeliveryRouteWithChildren = DeliveryRoute._addFileChildren(
+  DeliveryRouteChildren,
+)
 
 interface InvoicesRouteChildren {
   InvoicesSentRoute: typeof InvoicesSentRoute
@@ -300,7 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CustomersRoute: CustomersRoute,
-  DeliveryRoute: DeliveryRoute,
+  DeliveryRoute: DeliveryRouteWithChildren,
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
