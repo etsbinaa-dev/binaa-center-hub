@@ -464,7 +464,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         </div>
 
         <DialogFooter>
-          <Button type="submit" disabled={createOrder.isPending || !customerId}>
+          <Button type="submit" disabled={createOrder.isPending || (!customerId && !(newName.trim() && newPhone.trim()))}>
             {createOrder.isPending ? "جارٍ الحفظ…" : "حفظ الطلب"}
           </Button>
         </DialogFooter>
