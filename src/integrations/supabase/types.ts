@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          password: string
+          phone: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          password: string
+          phone: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          password?: string
+          phone?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
