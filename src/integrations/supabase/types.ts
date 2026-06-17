@@ -38,6 +38,56 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string
+          id: string
+          image_path: string | null
+          invoice_number: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name: string
+          customer_phone: string
+          id?: string
+          image_path?: string | null
+          invoice_number: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          image_path?: string | null
+          invoice_number?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -174,6 +224,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee"
+      invoice_status: "new" | "sent"
       order_status: "active" | "archived"
     }
     CompositeTypes: {
@@ -303,6 +354,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee"],
+      invoice_status: ["new", "sent"],
       order_status: ["active", "archived"],
     },
   },
