@@ -30,6 +30,7 @@ import {
   Copy,
 } from "lucide-react";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activity";
 
 const BUCKET = "invoice-files";
 
@@ -108,6 +109,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("تم نقل الفاتورة إلى تبويب «تم الإرسال»");
+      logActivity({ module: "invoices", action: "mark_sent", description: "وضع فاتورة كمُرسلة" });
     },
     onError: (e: Error) => toast.error("تعذر تحديث الحالة: " + e.message),
   });
@@ -137,6 +139,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("تم حذف الفاتورة");
+      logActivity({ module: "invoices", action: "delete", description: "حذف فاتورة" });
     },
     onError: (e: Error) => toast.error("تعذر الحذف: " + e.message),
   });
@@ -505,7 +508,14 @@ function ImportDialog({
         }
       }
 
-      if (ok > 0) toast.success(`تم استيراد ${ok} فاتورة`);
+      if (ok > 0) {
+        toast.success(`تم استيراد ${ok} فاتورة`);
+        logActivity({
+          module: "invoices",
+          action: "import",
+          description: `استيراد ${ok} فاتورة جديدة`,
+        });
+      }
       if (missing > 0) console.warn(`[invoice-extract] ${missing} invoice(s) without customer data`);
       if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
 

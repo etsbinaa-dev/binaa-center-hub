@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          description: string
+          id: string
+          module: string
+          user_id: string | null
+          user_name: string
+          user_role: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description: string
+          id?: string
+          module: string
+          user_id?: string | null
+          user_name: string
+          user_role?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          id?: string
+          module?: string
+          user_id?: string | null
+          user_name?: string
+          user_role?: string | null
+        }
+        Relationships: []
+      }
       app_users: {
         Row: {
           active: boolean

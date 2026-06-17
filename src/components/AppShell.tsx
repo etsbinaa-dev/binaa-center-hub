@@ -9,6 +9,7 @@ import {
   User,
   Users,
   BarChart3,
+  Activity,
   Settings,
   Menu,
   X,
@@ -42,6 +43,7 @@ const NAV: NavItem[] = [
   { key: "customers", label: "العملاء", to: "/customers", icon: User },
   { key: "users", label: "المستخدمون", to: "/users", icon: Users },
   { key: "reports", label: "التقارير", to: "/reports", icon: BarChart3 },
+  { key: "settings", label: "سجل النشاط", to: "/activity", icon: Activity },
   { key: "settings", label: "الإعدادات", to: "/settings", icon: Settings },
 ];
 
@@ -168,7 +170,7 @@ function NavList({
               ? pathname === "/"
               : pathname === item.to || pathname.startsWith(item.to + "/");
           return (
-            <li key={item.key}>
+            <li key={item.to}>
               <Link
                 to={item.to}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${

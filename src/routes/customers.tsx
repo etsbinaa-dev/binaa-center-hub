@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Search, Phone, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activity";
 
 export const Route = createFileRoute("/customers")({
   head: () => ({ meta: [{ title: "العملاء — بِناء HUB" }] }),
@@ -60,6 +61,13 @@ function CustomersPage() {
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
       setOpen(false); setEditing(null);
       toast.success(vars.id ? "تم تحديث بيانات العميل" : "تم إضافة العميل");
+      logActivity({
+        module: "customers",
+        action: vars.id ? "update" : "create",
+        description: vars.id
+          ? `تم تعديل بيانات العميل ${vars.name}`
+          : `تم إضافة عميل جديد: ${vars.name}`,
+      });
     },
     onError: () => toast.error("تعذر حفظ بيانات العميل"),
   });

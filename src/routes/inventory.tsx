@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/activity";
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
@@ -117,7 +118,10 @@ function QuantitiesPage() {
     const { error } = await supabase.from("quantities").upsert(rows, { onConflict: "product_key" });
     setSaving(false);
     if (error) toast.error("تعذّر حفظ الكميات");
-    else toast.success("تم حفظ الكميات بنجاح");
+    else {
+      toast.success("تم حفظ الكميات بنجاح");
+      logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
+    }
   };
 
   return (
