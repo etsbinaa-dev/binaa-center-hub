@@ -197,6 +197,36 @@ export type Database = {
         }
         Relationships: []
       }
+      quantities: {
+        Row: {
+          category: string
+          label: string
+          min_quantity: number
+          product_key: string
+          quantity: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category: string
+          label: string
+          min_quantity?: number
+          product_key: string
+          quantity?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          label?: string
+          min_quantity?: number
+          product_key?: string
+          quantity?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
