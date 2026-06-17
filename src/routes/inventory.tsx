@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
+
+const LOW_STOCK_THRESHOLD = 5;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
@@ -80,20 +83,24 @@ function QuantitiesPage() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedLow, setSavedLow] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.from("quantities").select("product_key, quantity");
       if (!error && data) {
+        const low: Record<string, boolean> = {};
         setValues((prev) => {
           const next = { ...prev };
           for (const r of data) {
             if (r.product_key in next) {
               next[r.product_key] = r.quantity ?? 0;
+              low[r.product_key] = (r.quantity ?? 0) <= LOW_STOCK_THRESHOLD;
             }
           }
           return next;
         });
+        setSavedLow(low);
       }
       setLoading(false);
     })();
@@ -121,6 +128,19 @@ function QuantitiesPage() {
     else {
       toast.success("تم حفظ الكميات بنجاح");
       logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
+      const newlyLow: { key: string; label: string }[] = [];
+      const nextLow: Record<string, boolean> = {};
+      for (const s of SECTIONS) {
+        for (const p of s.items) {
+          const isLow = values[p.key] <= LOW_STOCK_THRESHOLD;
+          nextLow[p.key] = isLow;
+          if (isLow && !savedLow[p.key]) newlyLow.push(p);
+        }
+      }
+      setSavedLow(nextLow);
+      for (const p of newlyLow) {
+        notify("low_stock", `تحذير: ${p.label} وصل إلى المخزون الحرج.`);
+      }
     }
   };
 

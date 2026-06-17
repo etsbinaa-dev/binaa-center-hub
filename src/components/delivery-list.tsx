@@ -8,6 +8,7 @@ import { Search, Phone, Clock, CheckCircle2, Truck, PackageCheck, MessageCircle 
 import { toast } from "sonner";
 import { OrderAttachmentsView } from "@/components/order-attachments-view";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 type DeliveryStatus = "new" | "in_progress" | "delivered";
 
@@ -73,8 +74,10 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
       const cname = order?.customers?.name ?? "—";
       if (vars.next === "delivered") {
         logActivity({ module: "delivery", action: "delivered", description: `تأكيد تسليم طلب العميل ${cname}` });
+        notify("delivery_done", `تم تسليم طلب العميل ${cname}.`, vars.id);
       } else if (vars.next === "in_progress") {
         logActivity({ module: "delivery", action: "start_delivery", description: `بدء توصيل طلب العميل ${cname}` });
+        notify("delivery_start", `بدأ توصيل طلب العميل ${cname}.`, vars.id);
       }
     },
     onError: (e: any) => toast.error(e.message),

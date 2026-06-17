@@ -8,7 +8,16 @@ export type Notification = {
   id: string;
   user_id: string;
   order_id: string | null;
-  type: "created" | "updated" | "archived" | string;
+  type:
+    | "created"
+    | "updated"
+    | "archived"
+    | "invoice_new"
+    | "invoice_sent"
+    | "delivery_start"
+    | "delivery_done"
+    | "low_stock"
+    | string;
   message: string;
   read: boolean;
   created_at: string;
@@ -26,7 +35,7 @@ export function useNotifications() {
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
       if (error) throw error;
       return (data ?? []) as Notification[];
     },
@@ -76,8 +85,21 @@ export function useNotifications() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", user?.id] }),
   });
 
+  const clearRead = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("read", true);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", user?.id] }),
+  });
+
   const notifications = query.data ?? [];
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  return { notifications, unreadCount, isLoading: query.isLoading, markRead, markAllRead };
+  return { notifications, unreadCount, isLoading: query.isLoading, markRead, markAllRead, clearRead };
 }

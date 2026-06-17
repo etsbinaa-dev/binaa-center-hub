@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 const BUCKET = "invoice-files";
 
@@ -99,17 +100,19 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
   });
 
   const markSent = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (inv: { id: string; invoice_number: string }) => {
       const { error } = await supabase
         .from("invoices")
         .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", inv.id);
       if (error) throw error;
+      return inv;
     },
-    onSuccess: () => {
+    onSuccess: (inv) => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("تم نقل الفاتورة إلى تبويب «تم الإرسال»");
       logActivity({ module: "invoices", action: "mark_sent", description: "وضع فاتورة كمُرسلة" });
+      notify("invoice_sent", `تم إرسال الفاتورة رقم ${inv.invoice_number}.`);
     },
     onError: (e: Error) => toast.error("تعذر تحديث الحالة: " + e.message),
   });
@@ -183,7 +186,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
               invoice={inv}
               onView={() => setViewing(inv)}
               onEdit={() => setEditing(inv)}
-              onMarkSent={() => markSent.mutate(inv.id)}
+              onMarkSent={() => markSent.mutate({ id: inv.id, invoice_number: inv.invoice_number })}
               onMarkNew={() => markNew.mutate(inv.id)}
               onDelete={() => remove.mutate(inv)}
               canDelete={isAdmin}
@@ -515,6 +518,9 @@ function ImportDialog({
           action: "import",
           description: `استيراد ${ok} فاتورة جديدة`,
         });
+        for (let i = 0; i < ok; i++) {
+          notify("invoice_new", "تمت إضافة فاتورة جديدة غير مرسلة.");
+        }
       }
       if (missing > 0) console.warn(`[invoice-extract] ${missing} invoice(s) without customer data`);
       if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
