@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, CheckCircle2, Trash2, Phone, Clock, ChevronDown, Pencil, Archive, RotateCcw } from "lucide-react";
+import { Search, Plus, CheckCircle2, Trash2, Phone, Clock, ChevronDown, Pencil, Archive, RotateCcw, Contact } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -299,16 +299,44 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
 
   const createOrder = useMutation({
     mutationFn: async () => {
-      if (!customerId) throw new Error("اختر عميلاً");
+      let cid = customerId;
+      let cName = customers.find((x) => x.id === cid)?.name ?? "";
+      let cPhone = customers.find((x) => x.id === cid)?.phone ?? "";
+
+      // Auto-create / reuse customer from inline name+phone if no selection
+      if (!cid && newName.trim() && newPhone.trim()) {
+        const phone = newPhone.trim();
+        const existing = customers.find((x) => x.phone === phone);
+        if (existing) {
+          cid = existing.id;
+          cName = existing.name;
+          cPhone = existing.phone;
+        } else {
+          const { data, error } = await supabase
+            .from("customers")
+            .insert({ name: newName.trim(), phone })
+            .select()
+            .single();
+          if (error) throw error;
+          cid = data.id;
+          cName = data.name;
+          cPhone = data.phone;
+          qc.invalidateQueries({ queryKey: ["customers-all"] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+          qc.invalidateQueries({ queryKey: ["count", "customers"] });
+        }
+      }
+
+      if (!cid) throw new Error("اختر عميلاً أو أدخل الاسم والهاتف");
       const hasExistingAttachments = !!initial && Boolean(initial.images?.length || initial.voice_note || initial.files?.length);
       if (!details.trim() && attachments.images.length === 0 && !attachments.voice && attachments.files.length === 0 && !hasExistingAttachments) {
         throw new Error("أضف تفاصيل أو صورة أو تسجيلاً صوتياً أو ملفاً");
       }
-      const { imagePaths, voicePath, filePaths } = await uploadAttachments(customerId, attachments);
+      const { imagePaths, voicePath, filePaths } = await uploadAttachments(cid, attachments);
 
       if (initial) {
         const { error } = await supabase.from("orders").update({
-          customer_id: customerId,
+          customer_id: cid,
           details: details.trim() ? details : null,
           images: [...(initial.images ?? []), ...imagePaths],
           voice_note: voicePath ?? initial.voice_note,
@@ -317,7 +345,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         if (error) throw error;
       } else {
         const { error } = await supabase.from("orders").insert({
-          customer_id: customerId,
+          customer_id: cid,
           details: details.trim() ? details : null,
           images: imagePaths,
           voice_note: voicePath,
@@ -325,8 +353,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         });
         if (error) throw error;
       }
-      const c = customers.find((x) => x.id === customerId);
-      return { name: c?.name ?? "—", phone: c?.phone ?? "—", details };
+      return { name: cName || "—", phone: cPhone || "—", details };
     },
     onSuccess: (info) => {
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -340,6 +367,29 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const contactPickerSupported = typeof window !== "undefined"
+    && "contacts" in navigator
+    && typeof (navigator as any).contacts?.select === "function";
+
+  async function pickFromContacts() {
+    try {
+      const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      if (!contacts || contacts.length === 0) return;
+      const c = contacts[0];
+      const name = Array.isArray(c.name) ? c.name[0] : c.name;
+      const tel = Array.isArray(c.tel) ? c.tel[0] : c.tel;
+      if (name) setNewName(String(name));
+      if (tel) setNewPhone(String(tel).replace(/\s+/g, ""));
+      // Clear any selected existing customer so the inline fields drive creation
+      setCustomerId(null);
+      setCustomerLabel("");
+      toast.success("تم استيراد جهة الاتصال");
+    } catch (e: any) {
+      toast.error("تعذر فتح جهات الاتصال: " + (e?.message || "غير مدعوم"));
+    }
+  }
+
 
   return (
     <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto">
@@ -374,17 +424,28 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         </div>
 
         <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-          <p className="text-xs text-muted-foreground">عميل جديد؟ أضفه هنا</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <Input placeholder="الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} dir="ltr" />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">عميل جديد؟ أدخل بياناته أو اختره من جهات الاتصال</p>
+            {contactPickerSupported && (
+              <Button type="button" variant="outline" size="sm" onClick={pickFromContacts} className="shrink-0">
+                <Contact className="h-4 w-4 ml-1" />جهات الاتصال
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex gap-2">
+              <Input placeholder="الاسم" value={newName} onChange={(e) => { setNewName(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} className="flex-1" />
+            </div>
+            <Input placeholder="الهاتف" value={newPhone} onChange={(e) => { setNewPhone(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} dir="ltr" />
           </div>
           <Button type="button" variant="secondary" size="sm" className="w-full"
             disabled={!newName || !newPhone || createCustomer.isPending}
             onClick={() => createCustomer.mutate()}>
-            <Plus className="h-4 w-4 ml-1" />إضافة عميل
+            <Plus className="h-4 w-4 ml-1" />حفظ كعميل الآن (اختياري)
           </Button>
+          <p className="text-[11px] text-muted-foreground">إن لم تحفظه الآن، سيتم حفظه تلقائياً عند حفظ الطلب.</p>
         </div>
+
 
         <div className="space-y-2">
           <Label>تفاصيل الطلب</Label>
@@ -403,7 +464,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         </div>
 
         <DialogFooter>
-          <Button type="submit" disabled={createOrder.isPending || !customerId}>
+          <Button type="submit" disabled={createOrder.isPending || (!customerId && !(newName.trim() && newPhone.trim()))}>
             {createOrder.isPending ? "جارٍ الحفظ…" : "حفظ الطلب"}
           </Button>
         </DialogFooter>
