@@ -170,7 +170,7 @@ function NavList({
               ? pathname === "/"
               : pathname === item.to || pathname.startsWith(item.to + "/");
           return (
-            <li key={item.key}>
+            <li key={item.to}>
               <Link
                 to={item.to}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
