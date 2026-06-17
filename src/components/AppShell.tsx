@@ -118,6 +118,7 @@ export function AppShell({
             </button>
             <h1 className="min-w-0 truncate text-lg font-bold sm:text-xl">{title}</h1>
             <div className="ms-auto flex items-center gap-2">
+              <NotificationsBell />
               <AuthControls />
               <RoleSelect role={role} setRole={setRole} />
             </div>
