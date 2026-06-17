@@ -19,10 +19,6 @@ export function ModulePlaceholder({
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
           {description}
         </p>
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-          الوحدة جاهزة للتطوير — لا توجد بيانات حالياً
-        </div>
       </div>
     </div>
   );
