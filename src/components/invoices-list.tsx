@@ -321,6 +321,7 @@ function ImportDialog({
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const extract = useServerFn(extractInvoiceFields);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -328,6 +329,25 @@ function ImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+
+  async function fileToBase64(f: File): Promise<string> {
+    const buf = await f.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(
+        null,
+        Array.from(bytes.subarray(i, i + chunk)),
+      );
+    }
+    return btoa(binary);
+  }
+
+  async function extractFromFile(f: File) {
+    const b64 = await fileToBase64(f);
+    return extract({ data: { imageBase64: b64, mimeType: f.type || "image/jpeg" } });
+  }
 
   function reset() {
     setCustomerName("");
