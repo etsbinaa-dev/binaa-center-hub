@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export type Role = "admin" | "accountant" | "delivery";
+export type Role = "admin" | "accountant" | "delivery" | "monitor";
 
 export const ROLES: { value: Role; label: string; description: string }[] = [
   {
@@ -11,14 +11,17 @@ export const ROLES: { value: Role; label: string; description: string }[] = [
   {
     value: "accountant",
     label: "المحاسب",
-    description:
-      "رؤية الطلبات، إنشاء وتعديل الفواتير، إدارة العملاء، وأرشفة الطلبات والفواتير.",
+    description: "الطلبات، الفواتير، العملاء، التقارير، الكميات.",
   },
   {
     value: "delivery",
-    label: "قسم التوصيلات",
-    description:
-      "رؤية الطلبات المفوترة الجاهزة للتوصيل وتحديث حالة التسليم — بدون رؤية الأسعار.",
+    label: "مسؤول التوصيل",
+    description: "قسم التوصيل فقط: الاتصال، الواتساب، تأكيد التسليم.",
+  },
+  {
+    value: "monitor",
+    label: "المراقب",
+    description: "صفحة الكميات فقط.",
   },
 ];
 
@@ -34,14 +37,14 @@ export type ModuleKey =
   | "settings";
 
 export const MODULE_ACCESS: Record<ModuleKey, Role[]> = {
-  home: ["admin", "accountant", "delivery"],
+  home: ["admin", "accountant", "delivery", "monitor"],
   orders: ["admin", "accountant"],
   invoices: ["admin", "accountant"],
   delivery: ["admin", "delivery"],
-  inventory: ["admin", "accountant"],
+  inventory: ["admin", "accountant", "monitor"],
   customers: ["admin", "accountant"],
   users: ["admin"],
-  reports: ["admin"],
+  reports: ["admin", "accountant"],
   settings: ["admin"],
 };
 
