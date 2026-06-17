@@ -236,3 +236,30 @@ function AccessDenied() {
     </div>
   );
 }
+
+function AuthControls() {
+  const { user, signOut, loading } = useAuth();
+  if (loading) return null;
+  if (!user) {
+    return (
+      <Link
+        to="/auth"
+        className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted"
+      >
+        <LogIn className="h-4 w-4" />
+        <span className="hidden sm:inline">تسجيل الدخول</span>
+      </Link>
+    );
+  }
+  return (
+    <button
+      onClick={() => signOut()}
+      className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted"
+      aria-label="تسجيل الخروج"
+    >
+      <LogOut className="h-4 w-4" />
+      <span className="hidden sm:inline">خروج</span>
+    </button>
+  );
+}
+
