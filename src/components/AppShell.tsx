@@ -13,7 +13,11 @@ import {
   Menu,
   X,
   Building2,
+  LogIn,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { NotificationsBell } from "@/components/notifications-bell";
 import {
   RoleContext,
   ROLES,
@@ -113,7 +117,8 @@ export function AppShell({
               <Menu className="h-5 w-5" />
             </button>
             <h1 className="min-w-0 truncate text-lg font-bold sm:text-xl">{title}</h1>
-            <div className="ms-auto">
+            <div className="ms-auto flex items-center gap-2">
+              <AuthControls />
               <RoleSelect role={role} setRole={setRole} />
             </div>
           </header>
