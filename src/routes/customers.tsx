@@ -55,11 +55,11 @@ function CustomersPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
       setOpen(false); setEditing(null);
-      toast.success("تم الحفظ");
+      toast.success(vars.id ? "تم تحديث بيانات العميل" : "تم إضافة العميل");
     },
     onError: () => toast.error("تعذر حفظ بيانات العميل"),
   });
