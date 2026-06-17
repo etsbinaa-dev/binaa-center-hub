@@ -576,3 +576,89 @@ function ImportDialog({
     </Dialog>
   );
 }
+
+function EditDialog({
+  invoice,
+  onOpenChange,
+}: {
+  invoice: Invoice | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [number, setNumber] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (invoice) {
+      setName(invoice.customer_name);
+      setPhone(invoice.customer_phone);
+      setNumber(invoice.invoice_number);
+    }
+  }, [invoice]);
+
+  async function save() {
+    if (!invoice) return;
+    if (!name.trim() || !number.trim()) {
+      toast.error("الاسم ورقم الفاتورة مطلوبان");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          invoice_number: number.trim(),
+        })
+        .eq("id", invoice.id);
+      if (error) throw error;
+      toast.success("تم تحديث بيانات الفاتورة");
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      onOpenChange(false);
+    } catch (e) {
+      toast.error("تعذر التحديث: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!invoice} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>تعديل الفاتورة</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>اسم العميل</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>رقم الواتساب</Label>
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              dir="ltr"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>رقم الفاتورة</Label>
+            <Input value={number} onChange={(e) => setNumber(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            إلغاء
+          </Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? "جارٍ الحفظ…" : "حفظ"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
