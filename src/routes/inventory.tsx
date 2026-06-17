@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
+
+const LOW_STOCK_THRESHOLD = 5;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
