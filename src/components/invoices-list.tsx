@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { extractInvoiceFields } from "@/lib/invoice-extract.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -319,6 +321,7 @@ function ImportDialog({
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const extract = useServerFn(extractInvoiceFields);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -326,6 +329,25 @@ function ImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+
+  async function fileToBase64(f: File): Promise<string> {
+    const buf = await f.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(
+        null,
+        Array.from(bytes.subarray(i, i + chunk)),
+      );
+    }
+    return btoa(binary);
+  }
+
+  async function extractFromFile(f: File) {
+    const b64 = await fileToBase64(f);
+    return extract({ data: { imageBase64: b64, mimeType: f.type || "image/jpeg" } });
+  }
 
   function reset() {
     setCustomerName("");
@@ -380,28 +402,51 @@ function ImportDialog({
     if (bulkFiles.length === 0) return;
     setBusy(true);
     let ok = 0;
+    let missing = 0;
     try {
       for (const f of bulkFiles) {
         try {
+          const extracted = await extractFromFile(f);
+          console.debug("[invoice-extract]", f.name, {
+            raw_text: extracted.raw_text,
+            customer_name: extracted.customer_name,
+            customer_phone: extracted.customer_phone,
+            invoice_number: extracted.invoice_number,
+            error: extracted.error,
+          });
+
+          const hasCustomer = !!(extracted.customer_name && extracted.customer_phone);
+          if (!hasCustomer) {
+            missing++;
+            toast.warning(
+              `${f.name}: لم يتم العثور على بيانات العميل في الفاتورة`,
+            );
+            continue;
+          }
+
           const path = await uploadFile(f);
-          const invNum = f.name.replace(/\.[^.]+$/, "");
+          const fallbackInv = f.name.replace(/\.[^.]+$/, "");
           const { error } = await supabase.from("invoices").insert({
-            customer_name: "—",
-            customer_phone: "—",
-            invoice_number: invNum,
+            customer_name: extracted.customer_name!,
+            customer_phone: extracted.customer_phone!,
+            invoice_number: extracted.invoice_number || fallbackInv,
             image_path: path,
             status: "new",
             created_by: user?.id ?? null,
           });
           if (!error) ok++;
-        } catch {
-          /* skip */
+        } catch (e) {
+          console.error("[invoice-extract] file failed", f.name, e);
         }
       }
-      toast.success(`تم استيراد ${ok} فاتورة`);
+      if (ok > 0) toast.success(`تم استيراد ${ok} فاتورة`);
+      if (missing > 0 && ok === 0)
+        toast.error(`تعذر استيراد ${missing} فاتورة لعدم وجود بيانات العميل`);
       qc.invalidateQueries({ queryKey: ["invoices"] });
-      reset();
-      onOpenChange(false);
+      if (ok > 0) {
+        reset();
+        onOpenChange(false);
+      }
     } finally {
       setBusy(false);
     }
