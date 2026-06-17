@@ -55,13 +55,13 @@ function CustomersPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
       setOpen(false); setEditing(null);
-      toast.success("تم الحفظ");
+      toast.success(vars.id ? "تم تحديث بيانات العميل" : "تم إضافة العميل");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: () => toast.error("تعذر حفظ بيانات العميل"),
   });
 
   const del = useMutation({
@@ -72,9 +72,16 @@ function CustomersPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
-      toast.success("تم الحذف");
+      toast.success("تم حذف العميل");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => {
+      const msg = String(e?.message ?? "") + String(e?.details ?? "");
+      if (e?.code === "23503" || /foreign key|orders_customer_id_fkey/i.test(msg)) {
+        toast.error("لا يمكن حذف العميل لأنه مرتبط بطلبات موجودة.");
+      } else {
+        toast.error("تعذر حذف العميل");
+      }
+    },
   });
 
   return (
@@ -89,12 +96,14 @@ function CustomersPage() {
             <Button size="sm"><Plus className="h-4 w-4 ml-1" />إضافة</Button>
           </DialogTrigger>
           <CustomerDialog
+            key={editing?.id ?? "new"}
             initial={editing}
             onSubmit={(v) => save.mutate({ ...v, id: editing?.id })}
             loading={save.isPending}
           />
         </Dialog>
       </div>
+
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
