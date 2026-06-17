@@ -403,50 +403,74 @@ function ImportDialog({
     setBusy(true);
     let ok = 0;
     let missing = 0;
+    let failed = 0;
     try {
       for (const f of bulkFiles) {
+        const fallbackInv = f.name.replace(/\.[^.]+$/, "");
+        let customer_name = "غير معروف";
+        let customer_phone = "";
+        let invoice_number = fallbackInv;
+        let extractionFailed = false;
+
+        // 1) Try OCR/extraction — never let it block the rest of the import
         try {
           const extracted = await extractFromFile(f);
-          console.debug("[invoice-extract]", f.name, {
-            raw_text: extracted.raw_text,
+          console.debug("[invoice-extract] OCR raw text for", f.name, "\n", extracted.raw_text);
+          console.debug("[invoice-extract] parsed", f.name, {
             customer_name: extracted.customer_name,
             customer_phone: extracted.customer_phone,
             invoice_number: extracted.invoice_number,
             error: extracted.error,
           });
 
-          const hasCustomer = !!(extracted.customer_name && extracted.customer_phone);
-          if (!hasCustomer) {
-            missing++;
-            toast.warning(
-              `${f.name}: لم يتم العثور على بيانات العميل في الفاتورة`,
-            );
-            continue;
-          }
+          if (extracted.customer_name) customer_name = extracted.customer_name;
+          if (extracted.customer_phone) customer_phone = extracted.customer_phone;
+          if (extracted.invoice_number) invoice_number = extracted.invoice_number;
 
+          if (!extracted.customer_name && !extracted.customer_phone) {
+            missing++;
+            toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+          }
+        } catch (e) {
+          extractionFailed = true;
+          console.error("[invoice-extract] OCR failed for", f.name, e);
+          toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+        }
+
+        // 2) Always try to save the invoice, even when extraction failed
+        try {
           const path = await uploadFile(f);
-          const fallbackInv = f.name.replace(/\.[^.]+$/, "");
           const { error } = await supabase.from("invoices").insert({
-            customer_name: extracted.customer_name!,
-            customer_phone: extracted.customer_phone!,
-            invoice_number: extracted.invoice_number || fallbackInv,
+            customer_name,
+            customer_phone,
+            invoice_number,
             image_path: path,
             status: "new",
             created_by: user?.id ?? null,
           });
-          if (!error) ok++;
+          if (error) throw error;
+          ok++;
         } catch (e) {
-          console.error("[invoice-extract] file failed", f.name, e);
+          failed++;
+          console.error("[invoice-extract] save failed", f.name, e);
+          toast.error(`${f.name}: تعذر حفظ الفاتورة`);
         }
+
+        void extractionFailed;
       }
+
       if (ok > 0) toast.success(`تم استيراد ${ok} فاتورة`);
-      if (missing > 0 && ok === 0)
-        toast.error(`تعذر استيراد ${missing} فاتورة لعدم وجود بيانات العميل`);
+      if (missing > 0) console.warn(`[invoice-extract] ${missing} invoice(s) without customer data`);
+      if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
+
       qc.invalidateQueries({ queryKey: ["invoices"] });
       if (ok > 0) {
         reset();
         onOpenChange(false);
       }
+    } catch (e) {
+      console.error("[invoice-extract] bulk failed", e);
+      toast.error("تعذر إكمال الاستيراد");
     } finally {
       setBusy(false);
     }
