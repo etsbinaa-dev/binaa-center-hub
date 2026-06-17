@@ -183,15 +183,15 @@ function SettingsPage() {
     confirmAnd(
       "هل تريد فعلاً مسح سجل النشاط بالكامل؟",
       "تم مسح سجل النشاط",
-      () => supabase.from("activity_logs").delete().not("id", "is", null),
+      async () => await supabase.from("activity_logs").delete().not("id", "is", null),
     );
 
   const clearArchivedOrders = () =>
     confirmAnd(
       "حذف جميع الطلبات المؤرشفة (التي لم تُسلَّم بعد)؟",
       "تم حذف الطلبات المؤرشفة",
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from("orders")
           .delete()
           .eq("status", "archived")
@@ -202,8 +202,8 @@ function SettingsPage() {
     confirmAnd(
       "حذف جميع طلبات التوصيل المُسلَّمة من الأرشيف؟",
       "تم حذف أرشيف التوصيل",
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from("orders")
           .delete()
           .eq("status", "archived")
