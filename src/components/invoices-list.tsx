@@ -20,7 +20,7 @@ import {
   Upload,
   Eye,
   Send,
-  CheckCircle2,
+  
   Phone,
   Receipt,
   ImageOff,
@@ -260,6 +260,7 @@ function InvoiceCard({
       else toast.message("افتح المحادثة ثم اضغط «نسخ الصورة» للصقها يدوياً");
     }
     window.open(waLink, "_blank", "noopener,noreferrer");
+    if (invoice.status === "new") onMarkSent();
   }
 
   async function handleCopyImage() {
@@ -330,12 +331,7 @@ function InvoiceCard({
             نسخ الصورة
           </Button>
         )}
-        {invoice.status === "new" ? (
-          <Button size="sm" className="gap-1.5" onClick={onMarkSent}>
-            <CheckCircle2 className="h-4 w-4" />
-            تم الإرسال
-          </Button>
-        ) : (
+        {invoice.status === "sent" && (
           <Button size="sm" variant="secondary" className="gap-1.5" onClick={onMarkNew}>
             إرجاع
           </Button>
