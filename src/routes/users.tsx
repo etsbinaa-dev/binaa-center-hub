@@ -15,6 +15,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { ROLES, type Role } from "@/lib/roles";
+import { logActivity } from "@/lib/activity";
 
 export const Route = createFileRoute("/users")({
   head: () => ({ meta: [{ title: "المستخدمون — بِناء HUB" }] }),
@@ -132,6 +133,13 @@ function UsersPage() {
     }
     setOpen(false);
     setToast(form.id ? "تم تحديث المستخدم" : "تم إضافة المستخدم");
+    logActivity({
+      module: "users",
+      action: form.id ? "update" : "create",
+      description: form.id
+        ? `تعديل بيانات المستخدم ${payload.name}`
+        : `إضافة مستخدم جديد: ${payload.name}`,
+    });
     load();
   };
 
@@ -145,6 +153,11 @@ function UsersPage() {
       return;
     }
     setToast(!u.active ? "تم تفعيل المستخدم" : "تم تعطيل المستخدم");
+    logActivity({
+      module: "users",
+      action: !u.active ? "enable" : "disable",
+      description: !u.active ? `تفعيل المستخدم ${u.name}` : `تعطيل المستخدم ${u.name}`,
+    });
     load();
   };
 
@@ -156,6 +169,7 @@ function UsersPage() {
       return;
     }
     setToast("تم حذف المستخدم");
+    logActivity({ module: "users", action: "delete", description: `حذف المستخدم ${u.name}` });
     load();
   };
 
