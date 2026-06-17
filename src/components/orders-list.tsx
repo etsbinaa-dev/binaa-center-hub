@@ -424,17 +424,28 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         </div>
 
         <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-          <p className="text-xs text-muted-foreground">عميل جديد؟ أضفه هنا</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="الاسم" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <Input placeholder="الهاتف" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} dir="ltr" />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">عميل جديد؟ أدخل بياناته أو اختره من جهات الاتصال</p>
+            {contactPickerSupported && (
+              <Button type="button" variant="outline" size="sm" onClick={pickFromContacts} className="shrink-0">
+                <Contact className="h-4 w-4 ml-1" />جهات الاتصال
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex gap-2">
+              <Input placeholder="الاسم" value={newName} onChange={(e) => { setNewName(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} className="flex-1" />
+            </div>
+            <Input placeholder="الهاتف" value={newPhone} onChange={(e) => { setNewPhone(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} dir="ltr" />
           </div>
           <Button type="button" variant="secondary" size="sm" className="w-full"
             disabled={!newName || !newPhone || createCustomer.isPending}
             onClick={() => createCustomer.mutate()}>
-            <Plus className="h-4 w-4 ml-1" />إضافة عميل
+            <Plus className="h-4 w-4 ml-1" />حفظ كعميل الآن (اختياري)
           </Button>
+          <p className="text-[11px] text-muted-foreground">إن لم تحفظه الآن، سيتم حفظه تلقائياً عند حفظ الطلب.</p>
         </div>
+
 
         <div className="space-y-2">
           <Label>تفاصيل الطلب</Label>
