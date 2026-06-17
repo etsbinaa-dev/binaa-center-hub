@@ -1,17 +1,59 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ClipboardList } from "lucide-react";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { ClipboardList, Archive } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { ModulePlaceholder } from "@/components/ModulePlaceholder";
+import { RequireAuth } from "@/components/RequireAuth";
+import { OrdersList } from "@/components/orders-list";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/orders")({
   head: () => ({ meta: [{ title: "الطلبات — بِناء HUB" }] }),
-  component: () => (
-    <AppShell moduleKey="orders" title="الطلبات">
-      <ModulePlaceholder
-        title="إدارة الطلبات"
-        description="ستظهر هنا قائمة الطلبات وحالاتها وأدوات الإنشاء والتعديل. سيتم بناء التفاصيل في الخطوات القادمة."
-        icon={<ClipboardList className="h-6 w-6" />}
-      />
-    </AppShell>
-  ),
+  component: OrdersPage,
 });
+
+function OrdersPage() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isArchive = pathname.startsWith("/orders/archive");
+
+  return (
+    <AppShell moduleKey="orders" title="الطلبات">
+      <RequireAuth>
+        <div className="space-y-5">
+          <Tabs isArchive={isArchive} />
+          <OrdersList status={isArchive ? "archived" : "active"} />
+        </div>
+      </RequireAuth>
+    </AppShell>
+  );
+}
+
+function Tabs({ isArchive }: { isArchive: boolean }) {
+  const base = "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-bold transition";
+  return (
+    <div className="flex gap-2">
+      <Link
+        to="/orders"
+        className={cn(
+          base,
+          !isArchive
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-card text-foreground hover:bg-muted"
+        )}
+      >
+        <ClipboardList className="h-4 w-4" />
+        الطلبات النشطة
+      </Link>
+      <Link
+        to="/orders/archive"
+        className={cn(
+          base,
+          isArchive
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-card text-foreground hover:bg-muted"
+        )}
+      >
+        <Archive className="h-4 w-4" />
+        الأرشيف
+      </Link>
+    </div>
+  );
+}
