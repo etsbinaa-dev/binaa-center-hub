@@ -35,7 +35,7 @@ export type ModuleKey =
 
 export const MODULE_ACCESS: Record<ModuleKey, Role[]> = {
   home: ["admin", "accountant", "delivery"],
-  orders: ["admin", "accountant", "delivery"],
+  orders: ["admin", "accountant"],
   invoices: ["admin", "accountant"],
   delivery: ["admin", "delivery"],
   inventory: ["admin"],
