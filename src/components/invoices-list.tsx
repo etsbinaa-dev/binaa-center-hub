@@ -186,7 +186,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
               invoice={inv}
               onView={() => setViewing(inv)}
               onEdit={() => setEditing(inv)}
-              onMarkSent={() => markSent.mutate(inv.id)}
+              onMarkSent={() => markSent.mutate({ id: inv.id, invoice_number: inv.invoice_number })}
               onMarkNew={() => markNew.mutate(inv.id)}
               onDelete={() => remove.mutate(inv)}
               canDelete={isAdmin}
