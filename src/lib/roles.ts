@@ -1,18 +1,25 @@
 import { createContext, useContext } from "react";
 
-export type Role =
-  | "admin"
-  | "accountant"
-  | "delivery_staff"
-  | "order_staff"
-  | "supervisor";
+export type Role = "admin" | "accountant" | "delivery";
 
-export const ROLES: { value: Role; label: string }[] = [
-  { value: "admin", label: "مدير النظام" },
-  { value: "accountant", label: "محاسب" },
-  { value: "delivery_staff", label: "موظف توصيل" },
-  { value: "order_staff", label: "موظف طلبات" },
-  { value: "supervisor", label: "مشرف" },
+export const ROLES: { value: Role; label: string; description: string }[] = [
+  {
+    value: "admin",
+    label: "المدير",
+    description: "صلاحيات كاملة على جميع الوحدات.",
+  },
+  {
+    value: "accountant",
+    label: "المحاسب",
+    description:
+      "رؤية الطلبات، إنشاء وتعديل الفواتير، إدارة العملاء، وأرشفة الطلبات والفواتير.",
+  },
+  {
+    value: "delivery",
+    label: "قسم التوصيلات",
+    description:
+      "رؤية الطلبات المفوترة الجاهزة للتوصيل وتحديث حالة التسليم — بدون رؤية الأسعار.",
+  },
 ];
 
 export type ModuleKey =
@@ -27,14 +34,14 @@ export type ModuleKey =
   | "settings";
 
 export const MODULE_ACCESS: Record<ModuleKey, Role[]> = {
-  home: ["admin", "accountant", "delivery_staff", "order_staff", "supervisor"],
-  orders: ["admin", "order_staff", "supervisor"],
-  invoices: ["admin", "accountant", "supervisor"],
-  delivery: ["admin", "delivery_staff", "supervisor"],
-  inventory: ["admin", "order_staff", "supervisor"],
-  customers: ["admin", "accountant", "order_staff", "supervisor"],
+  home: ["admin", "accountant", "delivery"],
+  orders: ["admin", "accountant", "delivery"],
+  invoices: ["admin", "accountant"],
+  delivery: ["admin", "delivery"],
+  inventory: ["admin"],
+  customers: ["admin", "accountant"],
   users: ["admin"],
-  reports: ["admin", "accountant", "supervisor"],
+  reports: ["admin"],
   settings: ["admin"],
 };
 
