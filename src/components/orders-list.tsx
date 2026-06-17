@@ -385,9 +385,22 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
       // Clear any selected existing customer so the inline fields drive creation
       setCustomerId(null);
       setCustomerLabel("");
-      toast.success("تم استيراد جهة الاتصال");
+      setContactsUnavailable(false);
     } catch (e: any) {
-      toast.error("تعذر فتح جهات الاتصال: " + (e?.message || "غير مدعوم"));
+      const msg = e?.message || "";
+      const isUnavailable =
+        msg.includes("security") ||
+        msg.includes("iframe") ||
+        msg.includes("InvalidStateError") ||
+        msg.includes("not allowed") ||
+        msg.includes("permission") ||
+        e?.name === "SecurityError" ||
+        e?.name === "InvalidStateError";
+      if (isUnavailable) {
+        setContactsUnavailable(true);
+        return;
+      }
+      toast.error("تعذر فتح جهات الاتصال: " + (msg || "غير مدعوم"));
     }
   }
 
