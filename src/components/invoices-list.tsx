@@ -33,6 +33,29 @@ import { toast } from "sonner";
 
 const BUCKET = "invoice-files";
 
+async function convertToPng(blob: Blob): Promise<Blob> {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no 2d context");
+    ctx.drawImage(img, 0, 0);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png"),
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 type Invoice = {
   id: string;
   customer_name: string;
