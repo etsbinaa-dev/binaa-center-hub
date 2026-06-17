@@ -131,6 +131,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string
+          delivered_at: string | null
+          delivery_status: Database["public"]["Enums"]["delivery_status"]
           details: string | null
           files: string[] | null
           id: string
@@ -143,6 +145,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id: string
+          delivered_at?: string | null
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
           details?: string | null
           files?: string[] | null
           id?: string
@@ -155,6 +159,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string
+          delivered_at?: string | null
+          delivery_status?: Database["public"]["Enums"]["delivery_status"]
           details?: string | null
           files?: string[] | null
           id?: string
@@ -224,6 +230,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee"
+      delivery_status: "new" | "in_progress" | "delivered"
       invoice_status: "new" | "sent"
       order_status: "active" | "archived"
     }
@@ -354,6 +361,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee"],
+      delivery_status: ["new", "in_progress", "delivered"],
       invoice_status: ["new", "sent"],
       order_status: ["active", "archived"],
     },
