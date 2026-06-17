@@ -1,17 +1,229 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Package } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Save, Loader2, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { ModulePlaceholder } from "@/components/ModulePlaceholder";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+type Product = { key: string; label: string };
+type Section = { category: string; title: string; items: Product[] };
+
+const SECTIONS: Section[] = [
+  {
+    category: "turkish",
+    title: "الحديد التركي",
+    items: [
+      { key: "fer_12_turkish", label: "فير 12 تركي" },
+      { key: "fer_10_turkish", label: "فير 10 تركي" },
+      { key: "fer_14_turkish", label: "فير 14 تركي" },
+      { key: "fer_16_turkish", label: "فير 16 تركي" },
+    ],
+  },
+  {
+    category: "northern",
+    title: "الحديد الشمالي",
+    items: [
+      { key: "fer_12_northern", label: "فير 12 شمالي" },
+      { key: "fer_10_northern", label: "فير 10 شمالي" },
+      { key: "fer_14_northern", label: "فير 14 شمالي" },
+      { key: "fer_16_northern", label: "فير 16 شمالي" },
+    ],
+  },
+  {
+    category: "chinese",
+    title: "الحديد الصيني",
+    items: [
+      { key: "fer_12_chinese", label: "فير 12 صيني" },
+      { key: "fer_10_chinese", label: "فير 10 صيني" },
+    ],
+  },
+  {
+    category: "algerian",
+    title: "الحديد الجزائري",
+    items: [
+      { key: "fer_12_algerian", label: "فير 12 جزائري" },
+      { key: "fer_10_algerian", label: "فير 10 جزائري" },
+      { key: "fer_14_algerian", label: "فير 14 جزائري" },
+    ],
+  },
+  {
+    category: "other",
+    title: "أخرى",
+    items: [
+      { key: "fer_8", label: "فير 8" },
+      { key: "fer_6_tam", label: "فير 6 تام" },
+      { key: "fer_5", label: "فير 5" },
+      { key: "fer_4", label: "فير 4" },
+    ],
+  },
+];
+
+type Row = { quantity: number; min_quantity: number };
 
 export const Route = createFileRoute("/inventory")({
-  head: () => ({ meta: [{ title: "المخزون — بِناء HUB" }] }),
-  component: () => (
-    <AppShell moduleKey="inventory" title="المخزون">
-      <ModulePlaceholder
-        title="إدارة المخزون"
-        description="متابعة الأصناف، الكميات، المستودعات، وحركات الإدخال والإخراج."
-        icon={<Package className="h-6 w-6" />}
-      />
-    </AppShell>
-  ),
+  head: () => ({ meta: [{ title: "الكميات — بِناء HUB" }] }),
+  component: QuantitiesPage,
 });
+
+function QuantitiesPage() {
+  const initial = useMemo(() => {
+    const m: Record<string, Row> = {};
+    for (const s of SECTIONS) for (const p of s.items) m[p.key] = { quantity: 0, min_quantity: 50 };
+    return m;
+  }, []);
+
+  const [values, setValues] = useState<Record<string, Row>>(initial);
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(SECTIONS.map((s) => [s.category, true])),
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from("quantities").select("*");
+      if (!error && data) {
+        setValues((prev) => {
+          const next = { ...prev };
+          for (const r of data) {
+            if (next[r.product_key]) {
+              next[r.product_key] = { quantity: r.quantity ?? 0, min_quantity: r.min_quantity ?? 50 };
+            }
+          }
+          return next;
+        });
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const update = (key: string, field: keyof Row, raw: string) => {
+    const n = raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0);
+    setValues((v) => ({ ...v, [key]: { ...v[key], [field]: n } }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    const rows = SECTIONS.flatMap((s) =>
+      s.items.map((p) => ({
+        product_key: p.key,
+        label: p.label,
+        category: s.category,
+        quantity: values[p.key].quantity,
+        min_quantity: values[p.key].min_quantity,
+      })),
+    );
+    const { error } = await supabase.from("quantities").upsert(rows, { onConflict: "product_key" });
+    setSaving(false);
+    if (error) toast.error("تعذّر حفظ الكميات");
+    else toast.success("تم حفظ الكميات بنجاح");
+  };
+
+  return (
+    <AppShell moduleKey="inventory" title="الكميات">
+      <div className="mx-auto max-w-2xl space-y-4 pb-32">
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          SECTIONS.map((s) => (
+            <section
+              key={s.category}
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+            >
+              <button
+                type="button"
+                onClick={() => setOpen((o) => ({ ...o, [s.category]: !o[s.category] }))}
+                className="flex w-full items-center justify-between gap-3 px-5 py-4 text-right transition-colors hover:bg-muted/40"
+              >
+                <span className="text-base font-bold sm:text-lg">{s.title}</span>
+                <ChevronDown
+                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
+                    open[s.category] ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {open[s.category] && (
+                <div className="space-y-3 border-t border-border bg-muted/20 p-3 sm:p-4">
+                  {s.items.map((p) => {
+                    const row = values[p.key];
+                    const low = row.quantity > 0 && row.quantity < row.min_quantity;
+                    return (
+                      <div
+                        key={p.key}
+                        className="rounded-xl border border-border bg-card p-4 shadow-sm"
+                      >
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-semibold sm:text-base">{p.label}</h3>
+                          {low && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              <AlertTriangle className="h-3 w-3" />
+                              تحت الحد
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`q-${p.key}`} className="text-xs text-muted-foreground">
+                              الكمية
+                            </Label>
+                            <Input
+                              id={`q-${p.key}`}
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={row.quantity}
+                              onChange={(e) => update(p.key, "quantity", e.target.value)}
+                              className="text-center text-base font-semibold"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`m-${p.key}`} className="text-xs text-muted-foreground">
+                              الحد الأدنى
+                            </Label>
+                            <Input
+                              id={`m-${p.key}`}
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={row.min_quantity}
+                              onChange={(e) => update(p.key, "min_quantity", e.target.value)}
+                              className="text-center text-base"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          ))
+        )}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 p-4 backdrop-blur-md">
+        <div className="mx-auto max-w-2xl">
+          <Button
+            onClick={save}
+            disabled={saving || loading}
+            className="h-14 w-full rounded-xl bg-green-600 text-base font-bold text-white shadow-lg hover:bg-green-700"
+          >
+            {saving ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <Save className="ms-2 h-5 w-5" />
+                حفظ الكميات
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </AppShell>
+  );
+}
