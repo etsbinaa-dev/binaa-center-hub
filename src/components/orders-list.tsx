@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, CheckCircle2, Trash2, Phone, Clock, ChevronDown } from "lucide-react";
+import { Search, Plus, CheckCircle2, Trash2, Phone, Clock, ChevronDown, Pencil, Archive, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -87,9 +87,10 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Order | null>(null);
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading, isError, error } = useQuery<Order[], Error>({
     queryKey: ["orders", status, search],
     refetchOnMount: "always",
     staleTime: 0,
@@ -107,18 +108,21 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
     },
   });
 
-  const markInvoiced = useMutation({
-    mutationFn: async (id: string) => {
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, nextStatus }: { id: string; nextStatus: "active" | "archived" }) => {
       const order = orders.find((o) => o.id === id);
-      const { error } = await supabase.from("orders").update({ status: "archived", invoiced_at: new Date().toISOString() }).eq("id", id);
+      const patch = nextStatus === "archived"
+        ? { status: nextStatus, invoiced_at: new Date().toISOString() }
+        : { status: nextStatus, invoiced_at: null };
+      const { error } = await supabase.from("orders").update(patch).eq("id", id);
       if (error) throw error;
-      return order;
+      return { order, nextStatus };
     },
-    onSuccess: (order) => {
+    onSuccess: ({ order, nextStatus }) => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["count", "orders"] });
-      toast.success("تم نقل الطلب إلى الأرشيف");
-      if (order) fireTelegram(notifyTelegram, "invoiced", order);
+      toast.success(nextStatus === "archived" ? "تم نقل الطلب إلى الأرشيف" : "تم إرجاع الطلب للنشطة");
+      if (order) fireTelegram(notifyTelegram, nextStatus === "archived" ? "invoiced" : "updated", order);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -148,10 +152,14 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 ml-1" />طلب جديد</Button>
             </DialogTrigger>
-            <NewOrderDialog onDone={() => setOpen(false)} />
+            <OrderDialog onDone={() => setOpen(false)} />
           </Dialog>
         )}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(nextOpen) => { if (!nextOpen) setEditing(null); }}>
+        {editing && <OrderDialog initial={editing} onDone={() => setEditing(null)} />}
+      </Dialog>
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -160,6 +168,8 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
 
       {isLoading ? (
         <p className="text-center text-muted-foreground py-8">جاري التحميل…</p>
+      ) : isError ? (
+        <Card className="p-8 text-center text-destructive">تعذر تحميل الطلبات: {error.message}</Card>
       ) : orders.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">لا توجد طلبات</Card>
       ) : (
@@ -173,9 +183,12 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
                     <Phone className="h-3 w-3" />{o.customers?.phone}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
-                  <Clock className="h-3 w-3" />
-                  {new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <StatusBadge status={o.status} />
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                  </div>
                 </div>
               </div>
               {o.details && o.details.trim() && (
@@ -184,10 +197,18 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
               <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
               <div className="flex justify-end gap-2 pt-1">
                 {status === "active" && (
-                  <Button size="sm" variant="default" onClick={() => markInvoiced.mutate(o.id)}>
+                  <Button size="sm" variant="default" onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "archived" })}>
                     <CheckCircle2 className="h-4 w-4 ml-1" />تم الفوترة
                   </Button>
                 )}
+                {status === "archived" && (
+                  <Button size="sm" variant="secondary" onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "active" })}>
+                    <RotateCcw className="h-4 w-4 ml-1" />إرجاع
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => setEditing(o)}>
+                  <Pencil className="h-4 w-4 ml-1" />تعديل
+                </Button>
                 {isAdmin && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -214,12 +235,29 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   );
 }
 
-function NewOrderDialog({ onDone }: { onDone: () => void }) {
+function StatusBadge({ status }: { status: "active" | "archived" }) {
+  if (status === "archived") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-muted bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+        <Archive className="h-3 w-3" />مؤرشف
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+      <CheckCircle2 className="h-3 w-3" />نشط
+    </span>
+  );
+}
+
+function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order }) {
   const qc = useQueryClient();
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [customerLabel, setCustomerLabel] = useState("");
-  const [details, setDetails] = useState("");
+  const isEditing = !!initial;
+  const [customerId, setCustomerId] = useState<string | null>(initial?.customer_id ?? null);
+  const [customerLabel, setCustomerLabel] = useState(initial?.customers ? `${initial.customers.name} — ${initial.customers.phone}` : "");
+  const [details, setDetails] = useState(initial?.details ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
@@ -262,29 +300,42 @@ function NewOrderDialog({ onDone }: { onDone: () => void }) {
   const createOrder = useMutation({
     mutationFn: async () => {
       if (!customerId) throw new Error("اختر عميلاً");
-      if (!details.trim() && attachments.images.length === 0 && !attachments.voice && attachments.files.length === 0) {
+      const hasExistingAttachments = !!initial && Boolean(initial.images?.length || initial.voice_note || initial.files?.length);
+      if (!details.trim() && attachments.images.length === 0 && !attachments.voice && attachments.files.length === 0 && !hasExistingAttachments) {
         throw new Error("أضف تفاصيل أو صورة أو تسجيلاً صوتياً أو ملفاً");
       }
       const { imagePaths, voicePath, filePaths } = await uploadAttachments(customerId, attachments);
-      const { error } = await supabase.from("orders").insert({
-        customer_id: customerId,
-        details: details.trim() ? details : null,
-        images: imagePaths,
-        voice_note: voicePath,
-        files: filePaths,
-      });
-      if (error) throw error;
+
+      if (initial) {
+        const { error } = await supabase.from("orders").update({
+          customer_id: customerId,
+          details: details.trim() ? details : null,
+          images: [...(initial.images ?? []), ...imagePaths],
+          voice_note: voicePath ?? initial.voice_note,
+          files: [...(initial.files ?? []), ...filePaths],
+        }).eq("id", initial.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("orders").insert({
+          customer_id: customerId,
+          details: details.trim() ? details : null,
+          images: imagePaths,
+          voice_note: voicePath,
+          files: filePaths,
+        });
+        if (error) throw error;
+      }
       const c = customers.find((x) => x.id === customerId);
       return { name: c?.name ?? "—", phone: c?.phone ?? "—", details };
     },
     onSuccess: (info) => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["count", "orders"] });
-      fireTelegram(notifyTelegram, "created", {
+      fireTelegram(notifyTelegram, initial ? "updated" : "created", {
         customers: { name: info.name, phone: info.phone },
         details: info.details,
       });
-      toast.success("تم إنشاء الطلب");
+      toast.success(initial ? "تم تحديث الطلب" : "تم إنشاء الطلب");
       onDone();
     },
     onError: (e: any) => toast.error(e.message),
@@ -292,7 +343,7 @@ function NewOrderDialog({ onDone }: { onDone: () => void }) {
 
   return (
     <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>طلب جديد</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{isEditing ? "تعديل الطلب" : "طلب جديد"}</DialogTitle></DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); createOrder.mutate(); }} className="space-y-4">
         <div className="space-y-2">
           <Label>العميل</Label>
@@ -343,6 +394,11 @@ function NewOrderDialog({ onDone }: { onDone: () => void }) {
 
         <div className="space-y-2">
           <Label>مرفقات</Label>
+          {isEditing && (initial?.images?.length || initial?.voice_note || initial?.files?.length) ? (
+            <div className="rounded-lg border bg-muted/20 p-2">
+              <OrderAttachmentsView images={initial.images} voice={initial.voice_note} files={initial.files} />
+            </div>
+          ) : null}
           <OrderAttachmentInput value={attachments} onChange={setAttachments} />
         </div>
 
