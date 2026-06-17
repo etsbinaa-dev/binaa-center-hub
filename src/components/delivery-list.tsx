@@ -8,6 +8,7 @@ import { Search, Phone, Clock, CheckCircle2, Truck, PackageCheck, MessageCircle 
 import { toast } from "sonner";
 import { OrderAttachmentsView } from "@/components/order-attachments-view";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 type DeliveryStatus = "new" | "in_progress" | "delivered";
 
