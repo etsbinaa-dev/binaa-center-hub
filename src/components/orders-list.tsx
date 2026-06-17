@@ -263,6 +263,7 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [attachments, setAttachments] = useState<LocalAttachments>({ images: [], voice: null, files: [] });
+  const [contactsUnavailable, setContactsUnavailable] = useState(false);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-all"],
@@ -384,9 +385,22 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
       // Clear any selected existing customer so the inline fields drive creation
       setCustomerId(null);
       setCustomerLabel("");
-      toast.success("تم استيراد جهة الاتصال");
+      setContactsUnavailable(false);
     } catch (e: any) {
-      toast.error("تعذر فتح جهات الاتصال: " + (e?.message || "غير مدعوم"));
+      const msg = e?.message || "";
+      const isUnavailable =
+        msg.includes("security") ||
+        msg.includes("iframe") ||
+        msg.includes("InvalidStateError") ||
+        msg.includes("not allowed") ||
+        msg.includes("permission") ||
+        e?.name === "SecurityError" ||
+        e?.name === "InvalidStateError";
+      if (isUnavailable) {
+        setContactsUnavailable(true);
+        return;
+      }
+      toast.error("تعذر فتح جهات الاتصال: " + (msg || "غير مدعوم"));
     }
   }
 
@@ -432,6 +446,11 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
               </Button>
             )}
           </div>
+          {contactsUnavailable && (
+            <p className="text-[11px] text-muted-foreground">
+              اختيار جهات الاتصال متاح فقط عند فتح التطبيق مباشرة على الهاتف.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="flex gap-2">
               <Input placeholder="الاسم" value={newName} onChange={(e) => { setNewName(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} className="flex-1" />
