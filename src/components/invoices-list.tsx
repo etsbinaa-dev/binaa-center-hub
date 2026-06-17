@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notify";
 
 const BUCKET = "invoice-files";
 
