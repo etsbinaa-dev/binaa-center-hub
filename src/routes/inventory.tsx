@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Save, Loader2, AlertTriangle } from "lucide-react";
+import { ChevronDown, Save, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,8 +61,6 @@ const SECTIONS: Section[] = [
   },
 ];
 
-type Row = { quantity: number; min_quantity: number };
-
 export const Route = createFileRoute("/inventory")({
   head: () => ({ meta: [{ title: "الكميات — بِناء HUB" }] }),
   component: QuantitiesPage,
@@ -70,12 +68,12 @@ export const Route = createFileRoute("/inventory")({
 
 function QuantitiesPage() {
   const initial = useMemo(() => {
-    const m: Record<string, Row> = {};
-    for (const s of SECTIONS) for (const p of s.items) m[p.key] = { quantity: 0, min_quantity: 50 };
+    const m: Record<string, number> = {};
+    for (const s of SECTIONS) for (const p of s.items) m[p.key] = 0;
     return m;
   }, []);
 
-  const [values, setValues] = useState<Record<string, Row>>(initial);
+  const [values, setValues] = useState<Record<string, number>>(initial);
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.category, true])),
   );
@@ -84,13 +82,13 @@ function QuantitiesPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("quantities").select("*");
+      const { data, error } = await supabase.from("quantities").select("product_key, quantity");
       if (!error && data) {
         setValues((prev) => {
           const next = { ...prev };
           for (const r of data) {
-            if (next[r.product_key]) {
-              next[r.product_key] = { quantity: r.quantity ?? 0, min_quantity: r.min_quantity ?? 50 };
+            if (r.product_key in next) {
+              next[r.product_key] = r.quantity ?? 0;
             }
           }
           return next;
@@ -100,9 +98,9 @@ function QuantitiesPage() {
     })();
   }, []);
 
-  const update = (key: string, field: keyof Row, raw: string) => {
+  const update = (key: string, raw: string) => {
     const n = raw === "" ? 0 : Math.max(0, parseInt(raw, 10) || 0);
-    setValues((v) => ({ ...v, [key]: { ...v[key], [field]: n } }));
+    setValues((v) => ({ ...v, [key]: n }));
   };
 
   const save = async () => {
@@ -112,8 +110,8 @@ function QuantitiesPage() {
         product_key: p.key,
         label: p.label,
         category: s.category,
-        quantity: values[p.key].quantity,
-        min_quantity: values[p.key].min_quantity,
+        quantity: values[p.key],
+        min_quantity: 50,
       })),
     );
     const { error } = await supabase.from("quantities").upsert(rows, { onConflict: "product_key" });
@@ -150,51 +148,38 @@ function QuantitiesPage() {
               {open[s.category] && (
                 <div className="space-y-3 border-t border-border bg-muted/20 p-3 sm:p-4">
                   {s.items.map((p) => {
-                    const row = values[p.key];
-                    const low = row.quantity > 0 && row.quantity < row.min_quantity;
+                    const qty = values[p.key];
+                    const low = qty <= 50;
                     return (
                       <div
                         key={p.key}
-                        className="rounded-xl border border-border bg-card p-4 shadow-sm"
+                        className={`rounded-xl border p-4 shadow-sm transition-colors ${
+                          low
+                            ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
+                            : "border-border bg-card"
+                        }`}
                       >
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <h3 className="text-sm font-semibold sm:text-base">{p.label}</h3>
                           {low && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              <AlertTriangle className="h-3 w-3" />
-                              تحت الحد
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-900 dark:text-red-200">
+                              مخزون منخفض
                             </span>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor={`q-${p.key}`} className="text-xs text-muted-foreground">
-                              الكمية
-                            </Label>
-                            <Input
-                              id={`q-${p.key}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={row.quantity}
-                              onChange={(e) => update(p.key, "quantity", e.target.value)}
-                              className="text-center text-base font-semibold"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor={`m-${p.key}`} className="text-xs text-muted-foreground">
-                              الحد الأدنى
-                            </Label>
-                            <Input
-                              id={`m-${p.key}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={row.min_quantity}
-                              onChange={(e) => update(p.key, "min_quantity", e.target.value)}
-                              className="text-center text-base"
-                            />
-                          </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`q-${p.key}`} className="text-xs text-muted-foreground">
+                            الكمية
+                          </Label>
+                          <Input
+                            id={`q-${p.key}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={qty}
+                            onChange={(e) => update(p.key, e.target.value)}
+                            className="text-center text-base font-semibold"
+                          />
                         </div>
                       </div>
                     );
