@@ -446,6 +446,11 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
               </Button>
             )}
           </div>
+          {contactsUnavailable && (
+            <p className="text-[11px] text-muted-foreground">
+              اختيار جهات الاتصال متاح فقط عند فتح التطبيق مباشرة على الهاتف.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="flex gap-2">
               <Input placeholder="الاسم" value={newName} onChange={(e) => { setNewName(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} className="flex-1" />
