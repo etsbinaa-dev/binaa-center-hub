@@ -19,7 +19,7 @@ export async function notify(
     const { error } = await supabase.rpc("create_notification", {
       p_type: type,
       p_message: message,
-      p_order_id: orderId ?? null,
+      p_order_id: orderId ?? undefined,
     });
     if (error) console.error("[notify]", error);
   } catch (e) {
