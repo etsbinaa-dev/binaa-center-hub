@@ -6,27 +6,34 @@ type Output = {
   customer_name: string | null;
   customer_phone: string | null;
   invoice_number: string | null;
+  amount: number | null;
   raw_text: string;
   error?: string;
 };
 
+
 const SYSTEM = `أنت تستخرج بيانات من صور فواتير عربية/إنجليزية.
 أعد JSON فقط بالحقول التالية بدون أي شرح:
 {
-  "raw_text": "النص الكامل المستخرج من الصورة كما هو سطراً بسطر",
+  "raw_text": "النص الكامل المستخرج من الصورة كما هو سطراً بسطر، شاملاً أي أرقام مكتوبة بخط اليد",
   "customer_name": "<اسم العميل>" | null,
   "customer_phone": "<رقم الواتساب للعميل>" | null,
-  "invoice_number": "<رقم الفاتورة>" | null
+  "invoice_number": "<رقم الفاتورة>" | null,
+  "handwritten_amount": "<الرقم المكتوب بخط اليد بعد To = أو TO = أو Total = أو TOTAL =>" | null,
+  "printed_total_max": "<أكبر رقم مطبوع تحت عمود Total أو Amount (AUM)>" | null
 }
 
-قواعد صارمة وإلزامية لاستخراج بيانات العميل (تعلو على أي منطق آخر):
-1. ابحث فقط عن السطر الذي يبدأ بكلمة "Client" (أو Client: أو العميل).
+قواعد لاستخراج بيانات العميل:
+1. ابحث عن السطر الذي يبدأ بكلمة "Client" (أو Client: أو العميل).
 2. اسم العميل = النص الموجود مباشرة بعد كلمة Client وقبل أول رقم في نفس السطر.
-3. رقم واتساب العميل = رقم موريتاني صالح مكوّن من 8 أرقام يبدأ بـ 2 أو 3 أو 4، موجود في نفس سطر Client فقط (مع تجاهل بادئة +222 أو 222 إن وُجدت).
-4. ممنوع منعاً باتاً استخراج رقم العميل من: رقم الفاتورة، كود العميل، أسطر المواد، الكميات، الأسعار، الإجماليات، التاريخ، أو أي سطر آخر.
-5. إذا لم يحتوِ سطر Client على رقم موريتاني صالح، اجعل customer_phone = null. لا تخمّن ولا تخترع رقماً أبداً.
-6. إذا لم يوجد سطر يبدأ بـ Client، اجعل customer_name و customer_phone = null.
-7. raw_text يجب أن يحتوي على النص الكامل المستخرج كما هو سطراً بسطر (إلزامي للتحقق).`;
+3. رقم واتساب العميل = رقم موريتاني صالح مكوّن من 8 أرقام يبدأ بـ 2 أو 3 أو 4، موجود في نفس سطر Client فقط.
+4. ممنوع استخراج رقم العميل من أي سطر آخر.
+5. إذا لم يحتوِ سطر Client على رقم موريتاني صالح، اجعل customer_phone = null.
+
+قواعد لاستخراج المبلغ:
+- handwritten_amount: ابحث في raw_text عن نص مكتوب بخط اليد يبدأ بـ "To =" أو "TO =" أو "Total =" أو "TOTAL =" (مع أو بدون مسافات) وأعد الرقم الذي يليه مباشرة. إن لم يوجد، اجعله null.
+- printed_total_max: أعد أكبر مبلغ مطبوع ظاهر في عمود Total أو Amount (AUM) داخل جدول الفاتورة. إن لم يوجد، اجعله null.
+- raw_text يجب أن يحتوي على كل النصوص بما فيها المكتوبة بخط اليد.`;
 
 // Mauritanian phone: 8 digits starting with 2, 3 or 4. Optional +222/222 prefix.
 function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
@@ -34,15 +41,33 @@ function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
   const lines = rawText.split(/\r?\n/);
   const clientLine = lines.find((l) => /^\s*(client|العميل)\b/i.test(l));
   if (!clientLine) return null;
-  // Strip the label so we don't accidentally match digits before "Client"
   const afterLabel = clientLine.replace(/^\s*(client\s*:?|العميل\s*:?)/i, " ");
-  // Normalize: keep digits, +, and spaces/dashes as separators
   const digits = afterLabel.replace(/[^\d+]/g, " ");
-  // Match: optional +222 / 222, then 8-digit number starting with 2/3/4
   const re = /(?:\+?222)?\s*([234]\d{7})(?!\d)/g;
   const m = re.exec(digits);
   if (!m) return null;
   return m[1];
+}
+
+function toNumber(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).replace(/[^\d.,-]/g, "").replace(/,/g, "");
+  if (!s) return null;
+  const n = parseFloat(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Deterministic re-scan of raw_text for handwritten "To =" / "Total =" amounts.
+function extractHandwrittenAmount(rawText: string): number | null {
+  if (!rawText) return null;
+  const re = /\b(?:to|total)\s*[=:]\s*([\d][\d.,\s]{0,20})/gi;
+  let best: number | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rawText)) !== null) {
+    const n = toNumber(m[1]);
+    if (n != null && (best == null || n > best)) best = n;
+  }
+  return best;
 }
 
 export const extractInvoiceFields = createServerFn({ method: "POST" })
@@ -55,6 +80,7 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         customer_name: null,
         customer_phone: null,
         invoice_number: null,
+        amount: null,
         raw_text: "",
         error: "LOVABLE_API_KEY is not configured",
       };
@@ -95,13 +121,14 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         customer_name: null,
         customer_phone: null,
         invoice_number: null,
+        amount: null,
         raw_text: "",
         error: `AI gateway error ${res.status}`,
       };
     }
     const json = await res.json();
     const content = json?.choices?.[0]?.message?.content ?? "";
-    let parsed: Partial<Output> = {};
+    let parsed: Record<string, unknown> = {};
     try {
       parsed = JSON.parse(typeof content === "string" ? content : "");
     } catch {
@@ -115,16 +142,22 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
       }
     }
 
-    const raw_text = parsed.raw_text?.toString() ?? "";
-
-    // MANDATORY: phone must come from the "Client" line and be a valid Mauritanian number.
-    // This deterministic post-processing overrides any phone the model produced.
+    const raw_text = (parsed.raw_text as string | undefined)?.toString() ?? "";
     const phoneFromClientLine = extractMauritanianPhoneFromClientLine(raw_text);
 
+    // Amount: prefer handwritten "To = / Total =" (model output then deterministic re-scan),
+    // fall back to largest printed total.
+    const handwritten =
+      toNumber(parsed.handwritten_amount) ?? extractHandwrittenAmount(raw_text);
+    const printed = toNumber(parsed.printed_total_max);
+    const amount = handwritten ?? printed;
+
     return {
-      customer_name: parsed.customer_name?.toString().trim() || null,
+      customer_name: (parsed.customer_name as string | undefined)?.toString().trim() || null,
       customer_phone: phoneFromClientLine,
-      invoice_number: parsed.invoice_number?.toString().trim() || null,
+      invoice_number: (parsed.invoice_number as string | undefined)?.toString().trim() || null,
+      amount,
       raw_text,
     };
   });
+

@@ -63,11 +63,14 @@ type Invoice = {
   customer_name: string;
   customer_phone: string;
   invoice_number: string;
+  amount: number | null;
+  amount_manual: boolean;
   image_path: string | null;
   status: "new" | "sent";
   sent_at: string | null;
   created_at: string;
 };
+
 
 export function InvoicesList({ status }: { status: "new" | "sent" }) {
   const { isAdmin } = useAuth();
@@ -316,7 +319,14 @@ function InvoiceCard({
           <Receipt className="h-3.5 w-3.5" />
           رقم الفاتورة: <span className="font-mono">{invoice.invoice_number}</span>
         </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          💵 المبلغ المستحق:{" "}
+          <span dir="ltr" className="font-mono">
+            {invoice.amount != null ? invoice.amount.toLocaleString("en-US") : "—"}
+          </span>
+        </div>
       </div>
+
 
       <div className="mt-auto flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={onView}>
@@ -468,6 +478,7 @@ function ImportDialog({
         let customer_name = "غير معروف";
         let customer_phone = "";
         let invoice_number = fallbackInv;
+        let amount: number | null = null;
 
         try {
           const extracted = await extractFromFile(f);
@@ -476,12 +487,14 @@ function ImportDialog({
             customer_name: extracted.customer_name,
             customer_phone: extracted.customer_phone,
             invoice_number: extracted.invoice_number,
+            amount: extracted.amount,
             error: extracted.error,
           });
 
           if (extracted.customer_name) customer_name = extracted.customer_name;
           if (extracted.customer_phone) customer_phone = extracted.customer_phone;
           if (extracted.invoice_number) invoice_number = extracted.invoice_number;
+          if (extracted.amount != null) amount = extracted.amount;
 
           if (!extracted.customer_name && !extracted.customer_phone) {
             missing++;
@@ -500,12 +513,14 @@ function ImportDialog({
             customer_name,
             customer_phone,
             invoice_number,
+            amount,
             image_path: path,
             status: "new",
             created_by: user?.id ?? null,
           });
           if (error) throw error;
           ok++;
+
         } catch (e) {
           failed++;
           console.error("[invoice-extract] save failed", f.name, e);
@@ -590,23 +605,35 @@ function EditDialog({
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [number, setNumber] = useState("");
+  const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (invoice) {
       setName(invoice.customer_name);
       setPhone(invoice.customer_phone);
-      setNumber(invoice.invoice_number);
+      setAmount(invoice.amount != null ? String(invoice.amount) : "");
     }
   }, [invoice]);
 
   async function save() {
     if (!invoice) return;
-    if (!name.trim() || !number.trim()) {
-      toast.error("الاسم ورقم الفاتورة مطلوبان");
+    if (!name.trim()) {
+      toast.error("اسم العميل مطلوب");
       return;
     }
+    const trimmedAmount = amount.trim();
+    let amountValue: number | null = null;
+    if (trimmedAmount !== "") {
+      const n = Number(trimmedAmount.replace(/,/g, ""));
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("المبلغ غير صالح");
+        return;
+      }
+      amountValue = n;
+    }
+    const amountChanged =
+      amountValue !== (invoice.amount == null ? null : Number(invoice.amount));
     setBusy(true);
     try {
       const { error } = await supabase
@@ -614,7 +641,8 @@ function EditDialog({
         .update({
           customer_name: name.trim(),
           customer_phone: phone.trim(),
-          invoice_number: number.trim(),
+          amount: amountValue,
+          ...(amountChanged ? { amount_manual: true } : {}),
         })
         .eq("id", invoice.id);
       if (error) throw error;
@@ -649,8 +677,19 @@ function EditDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label>رقم الفاتورة</Label>
-            <Input value={number} onChange={(e) => setNumber(e.target.value)} />
+            <Label>المبلغ المستحق</Label>
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              dir="ltr"
+              placeholder="0"
+            />
+            {invoice?.amount_manual && (
+              <p className="text-xs text-muted-foreground">
+                المبلغ معدّل يدوياً ولن يُستبدل عند إعادة الفحص.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -665,3 +704,4 @@ function EditDialog({
     </Dialog>
   );
 }
+
