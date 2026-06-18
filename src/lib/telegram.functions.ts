@@ -13,7 +13,7 @@ const HEADER: Record<Kind, string> = {
 function formatTimestamp(): string {
   try {
     return new Intl.DateTimeFormat("ar", {
-      timeZone: "Asia/Riyadh",
+      timeZone: "Africa/Nouakchott",
       dateStyle: "short",
       timeStyle: "short",
     }).format(new Date());
