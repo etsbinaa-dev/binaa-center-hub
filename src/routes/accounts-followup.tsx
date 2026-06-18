@@ -189,13 +189,37 @@ function AccountsFollowupPage() {
               <div className="space-y-3">
                 {pending.map((r) => {
                   const inv = invoices.find((i) => i.id === r.invoice_id);
+                  const sentAt = inv?.sent_at ? new Date(inv.sent_at) : null;
+                  const daysElapsed = sentAt
+                    ? Math.floor((Date.now() - sentAt.getTime()) / 86400000)
+                    : null;
+                  const phoneDigits = (inv?.customer_phone ?? "").replace(/[^\d]/g, "");
+                  const waMsg = inv
+                    ? `مرحباً ${inv.customer_name}، نود الاستفسار بخصوص الفاتورة رقم ${inv.invoice_number}.`
+                    : "";
+                  const waLink = phoneDigits
+                    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMsg)}`
+                    : null;
                   return (
                     <div key={r.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="text-sm font-semibold">{r.message}</div>
+                      <div className="text-sm font-semibold">
+                        {inv
+                          ? `هل دفع العميل ${inv.customer_name}؟`
+                          : r.message}
+                      </div>
                       {inv && (
-                        <div className="text-xs text-muted-foreground">
-                          فاتورة {inv.invoice_number} · {inv.customer_phone} ·{" "}
-                          {inv.amount != null ? `${inv.amount}` : "—"}
+                        <div className="text-xs text-muted-foreground space-y-0.5">
+                          <div>👤 {inv.customer_name}</div>
+                          <div dir="ltr">📞 {inv.customer_phone || "—"}</div>
+                          <div>🧾 رقم الفاتورة: {inv.invoice_number}</div>
+                          <div>💵 المبلغ: {inv.amount != null ? inv.amount : "—"}</div>
+                          <div>
+                            📅 تاريخ الإرسال:{" "}
+                            {sentAt ? sentAt.toLocaleDateString("ar") : "—"}
+                          </div>
+                          {daysElapsed != null && (
+                            <div>⏱️ مرّ {daysElapsed} يوم على الإرسال</div>
+                          )}
                         </div>
                       )}
                       <div className="flex flex-wrap gap-2">
@@ -231,6 +255,15 @@ function AccountsFollowupPage() {
                         >
                           <Clock className="h-4 w-4 ml-1" /> ذكّرني لاحقاً
                         </Button>
+                        {waLink && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+                          >
+                            <Send className="h-4 w-4 ml-1" /> واتساب
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
