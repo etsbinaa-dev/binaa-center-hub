@@ -319,7 +319,14 @@ function InvoiceCard({
           <Receipt className="h-3.5 w-3.5" />
           رقم الفاتورة: <span className="font-mono">{invoice.invoice_number}</span>
         </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          💵 المبلغ المستحق:{" "}
+          <span dir="ltr" className="font-mono">
+            {invoice.amount != null ? invoice.amount.toLocaleString("en-US") : "—"}
+          </span>
+        </div>
       </div>
+
 
       <div className="mt-auto flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={onView}>
