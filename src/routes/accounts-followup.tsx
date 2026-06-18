@@ -46,6 +46,33 @@ type Reminder = {
   created_at: string;
 };
 
+function safeNum(v: unknown): number {
+  if (v == null) return 0;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+function safeDate(v: unknown): Date | null {
+  if (!v) return null;
+  const d = new Date(v as string);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+function safeFormatDate(v: unknown): string {
+  const d = safeDate(v);
+  try {
+    return d ? d.toLocaleDateString("ar") : "—";
+  } catch {
+    return d ? d.toISOString().slice(0, 10) : "—";
+  }
+}
+function safeFormatDateTime(v: unknown): string {
+  const d = safeDate(v);
+  try {
+    return d ? d.toLocaleString("ar") : "—";
+  } catch {
+    return d ? d.toISOString() : "—";
+  }
+}
+
 function AccountsFollowupPage() {
   const fetchSettings = useServerFn(getFollowupSettings);
   const saveSettings = useServerFn(updateFollowupSettings);
@@ -68,6 +95,7 @@ function AccountsFollowupPage() {
   const remindersByInvoice = useMemo(() => {
     const m: Record<string, Reminder[]> = {};
     for (const r of reminders) {
+      if (!r || !r.invoice_id) continue;
       (m[r.invoice_id] ||= []).push(r);
     }
     return m;
@@ -77,16 +105,34 @@ function AccountsFollowupPage() {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([fetchSettings(), fetchList()]);
-      const sx = s as any;
+      const sx = (s as Record<string, unknown>) ?? {};
       setSettings({
-        threshold_amount: Number(sx.threshold_amount),
-        initial_delay_days: Number(sx.initial_delay_days),
-        snooze_days: Number(sx.snooze_days),
+        threshold_amount: safeNum(sx.threshold_amount) || 50000,
+        initial_delay_days: safeNum(sx.initial_delay_days) || 2,
+        snooze_days: safeNum(sx.snooze_days) || 3,
       });
-      setInvoices(((l as any).invoices ?? []) as Invoice[]);
-      setReminders(((l as any).reminders ?? []) as Reminder[]);
-    } catch (e: any) {
-      toast.error(e?.message ?? "تعذر تحميل البيانات");
+      const rawInvoices = ((l as { invoices?: unknown[] })?.invoices ?? []) as Invoice[];
+      // Drop entries missing an id, normalise amount to a safe number, log skips.
+      const cleanInvoices: Invoice[] = [];
+      for (const inv of rawInvoices) {
+        try {
+          if (!inv || !inv.id) {
+            console.warn("[followup] skipping invoice without id", inv);
+            continue;
+          }
+          cleanInvoices.push({
+            ...inv,
+            amount: inv.amount == null ? 0 : safeNum(inv.amount),
+          });
+        } catch (err) {
+          console.error("[followup] failed to normalise invoice", inv, err);
+        }
+      }
+      setInvoices(cleanInvoices);
+      setReminders(((l as { reminders?: unknown[] })?.reminders ?? []) as Reminder[]);
+    } catch (e) {
+      console.error("[followup] reload failed", e);
+      toast.error((e as Error)?.message ?? "تعذر تحميل البيانات");
     } finally {
       setLoading(false);
     }
@@ -96,6 +142,7 @@ function AccountsFollowupPage() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   return (
     <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
