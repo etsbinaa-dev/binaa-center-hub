@@ -333,93 +333,107 @@ function AccountsFollowupPage() {
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => {
-                const history = remindersByInvoice[inv.id] ?? [];
-                return (
-                  <div key={inv.id} className="rounded-lg border p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="font-semibold">{inv.customer_name}</div>
-                        <div className="text-xs text-muted-foreground" dir="ltr">
-                          {inv.customer_phone}
+                try {
+                  const history = remindersByInvoice[inv.id] ?? [];
+                  const currentAmount = safeNum(inv.amount);
+                  return (
+                    <div key={inv.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-semibold">{inv.customer_name || "—"}</div>
+                          <div className="text-xs text-muted-foreground" dir="ltr">
+                            {inv.customer_phone || "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            فاتورة {inv.invoice_number || "—"} · {safeFormatDate(inv.created_at)}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          فاتورة {inv.invoice_number} · {new Date(inv.created_at).toLocaleDateString("ar")}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                            inv.payment_status === "paid"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                          }`}
+                        >
+                          {inv.payment_status === "paid" ? "مدفوعة" : "غير مدفوعة"}
+                        </span>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">المبلغ</Label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount))}
+                            onChange={(e) =>
+                              setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
+                            }
+                          />
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            const raw = amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount));
+                            const num = raw === "" ? null : Number(raw);
+                            if (num !== null && (!Number.isFinite(num) || num < 0)) {
+                              toast.error("مبلغ غير صالح");
+                              return;
+                            }
+                            await saveAmount({ data: { invoice_id: inv.id, amount: num } });
+                            toast.success("تم حفظ المبلغ");
+                            reload();
+                          }}
+                        >
+                          حفظ
+                        </Button>
                       </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          inv.payment_status === "paid"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                        }`}
-                      >
-                        {inv.payment_status === "paid" ? "مدفوعة" : "غير مدفوعة"}
-                      </span>
+                      {history.length > 0 && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-muted-foreground">
+                            سجل التذكيرات ({history.length})
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {history.map((h) => {
+                              try {
+                                return (
+                                  <li key={h.id} className="rounded border bg-muted/30 p-2">
+                                    <div className="font-mono text-[10px] text-muted-foreground">
+                                      {safeFormatDateTime(h.created_at)}
+                                    </div>
+                                    <div>
+                                      الحالة:{" "}
+                                      {h.status === "paid"
+                                        ? "مدفوعة"
+                                        : h.status === "not_paid"
+                                          ? "غير مدفوعة"
+                                          : h.status === "snoozed"
+                                            ? "ذكّرني لاحقاً"
+                                            : "بانتظار الرد"}
+                                    </div>
+                                    {h.next_remind_at && (
+                                      <div className="text-muted-foreground">
+                                        التذكير التالي: {safeFormatDateTime(h.next_remind_at)}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              } catch (err) {
+                                console.error("[followup] failed to render reminder history row", h, err);
+                                return null;
+                              }
+                            })}
+                          </ul>
+                        </details>
+                      )}
                     </div>
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">المبلغ</Label>
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          value={amountDraft[inv.id] ?? (inv.amount?.toString() ?? "")}
-                          onChange={(e) =>
-                            setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          const raw = amountDraft[inv.id] ?? (inv.amount?.toString() ?? "");
-                          const num = raw === "" ? null : Number(raw);
-                          if (num !== null && (!Number.isFinite(num) || num < 0)) {
-                            toast.error("مبلغ غير صالح");
-                            return;
-                          }
-                          await saveAmount({ data: { invoice_id: inv.id, amount: num } });
-                          toast.success("تم حفظ المبلغ");
-                          reload();
-                        }}
-                      >
-                        حفظ
-                      </Button>
-                    </div>
-                    {history.length > 0 && (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-muted-foreground">
-                          سجل التذكيرات ({history.length})
-                        </summary>
-                        <ul className="mt-2 space-y-1">
-                          {history.map((h) => (
-                            <li key={h.id} className="rounded border bg-muted/30 p-2">
-                              <div className="font-mono text-[10px] text-muted-foreground">
-                                {new Date(h.created_at).toLocaleString("ar")}
-                              </div>
-                              <div>
-                                الحالة:{" "}
-                                {h.status === "paid"
-                                  ? "مدفوعة"
-                                  : h.status === "not_paid"
-                                    ? "غير مدفوعة"
-                                    : h.status === "snoozed"
-                                      ? "ذكّرني لاحقاً"
-                                      : "بانتظار الرد"}
-                              </div>
-                              {h.next_remind_at && (
-                                <div className="text-muted-foreground">
-                                  التذكير التالي: {new Date(h.next_remind_at).toLocaleString("ar")}
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
-                  </div>
-                );
+                  );
+                } catch (err) {
+                  console.error("[followup] failed to render invoice row", inv, err);
+                  return null;
+                }
               })}
+
             </div>
           )}
         </Card>
