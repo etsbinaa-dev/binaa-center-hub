@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_reminders: {
+        Row: {
+          created_at: string
+          due_at: string
+          id: string
+          invoice_id: string
+          message: string
+          next_remind_at: string | null
+          responded_at: string | null
+          responded_by: string | null
+          status: string
+          telegram_sent_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          due_at?: string
+          id?: string
+          invoice_id: string
+          message: string
+          next_remind_at?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
+          telegram_sent_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string
+          id?: string
+          invoice_id?: string
+          message?: string
+          next_remind_at?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: string
+          telegram_sent_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts_followup_settings: {
+        Row: {
+          created_at: string
+          id: number
+          initial_delay_days: number
+          snooze_days: number
+          threshold_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          initial_delay_days?: number
+          snooze_days?: number
+          threshold_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          initial_delay_days?: number
+          snooze_days?: number
+          threshold_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       activity_logs: {
         Row: {
           action: string
@@ -106,6 +183,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          amount: number | null
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -114,11 +192,15 @@ export type Database = {
           id: string
           image_path: string | null
           invoice_number: string
+          last_reminder_at: string | null
+          paid_at: string | null
+          payment_status: string
           sent_at: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           updated_at: string
         }
         Insert: {
+          amount?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -127,11 +209,15 @@ export type Database = {
           id?: string
           image_path?: string | null
           invoice_number: string
+          last_reminder_at?: string | null
+          paid_at?: string | null
+          payment_status?: string
           sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
         }
         Update: {
+          amount?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -140,6 +226,9 @@ export type Database = {
           id?: string
           image_path?: string | null
           invoice_number?: string
+          last_reminder_at?: string | null
+          paid_at?: string | null
+          payment_status?: string
           sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
