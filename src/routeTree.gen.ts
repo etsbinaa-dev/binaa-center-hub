@@ -23,6 +23,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrdersArchiveRouteImport } from './routes/orders.archive'
 import { Route as InvoicesSentRouteImport } from './routes/invoices.sent'
 import { Route as DeliveryArchiveRouteImport } from './routes/delivery.archive'
+import { Route as ApiPublicHooksAccountsFollowupScanRouteImport } from './routes/api/public/hooks/accounts-followup-scan'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -94,6 +95,12 @@ const DeliveryArchiveRoute = DeliveryArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => DeliveryRoute,
 } as any)
+const ApiPublicHooksAccountsFollowupScanRoute =
+  ApiPublicHooksAccountsFollowupScanRouteImport.update({
+    id: '/api/public/hooks/accounts-followup-scan',
+    path: '/api/public/hooks/accounts-followup-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesByTo {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +152,7 @@ export interface FileRoutesById {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/hooks/accounts-followup-scan'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/hooks/accounts-followup-scan'
   id:
     | '__root__'
     | '/'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/hooks/accounts-followup-scan'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -207,6 +220,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
+  ApiPublicHooksAccountsFollowupScanRoute: typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -309,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeliveryArchiveRouteImport
       parentRoute: typeof DeliveryRoute
     }
+    '/api/public/hooks/accounts-followup-scan': {
+      id: '/api/public/hooks/accounts-followup-scan'
+      path: '/api/public/hooks/accounts-followup-scan'
+      fullPath: '/api/public/hooks/accounts-followup-scan'
+      preLoaderRoute: typeof ApiPublicHooksAccountsFollowupScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -359,6 +380,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,
+  ApiPublicHooksAccountsFollowupScanRoute:
+    ApiPublicHooksAccountsFollowupScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
