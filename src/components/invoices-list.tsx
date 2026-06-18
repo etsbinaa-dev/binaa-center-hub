@@ -486,6 +486,8 @@ function ImportDialog({
           if (!extracted.customer_name && !extracted.customer_phone) {
             missing++;
             toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+          } else if (!extracted.customer_phone) {
+            toast.warning(`${f.name}: No phone number found`);
           }
         } catch (e) {
           console.error("[invoice-extract] OCR failed for", f.name, e);
