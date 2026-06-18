@@ -107,7 +107,7 @@ function PermissionsPage() {
         }
       }
     }
-    const { error } = await supabase.from("role_permissions").upsert(rows, {
+    const { error } = await (supabase as any).from("role_permissions").upsert(rows, {
       onConflict: "role,module,permission",
     });
     setSaving(false);
