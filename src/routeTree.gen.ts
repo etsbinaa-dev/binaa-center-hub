@@ -23,6 +23,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrdersArchiveRouteImport } from './routes/orders.archive'
 import { Route as InvoicesSentRouteImport } from './routes/invoices.sent'
 import { Route as DeliveryArchiveRouteImport } from './routes/delivery.archive'
+import { Route as ApiPublicTelegramTestRouteImport } from './routes/api/public/telegram-test'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -94,6 +95,11 @@ const DeliveryArchiveRoute = DeliveryArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => DeliveryRoute,
 } as any)
+const ApiPublicTelegramTestRoute = ApiPublicTelegramTestRouteImport.update({
+  id: '/api/public/telegram-test',
+  path: '/api/public/telegram-test',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/telegram-test': typeof ApiPublicTelegramTestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/telegram-test': typeof ApiPublicTelegramTestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
+  '/api/public/telegram-test': typeof ApiPublicTelegramTestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/telegram-test'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/telegram-test'
   id:
     | '__root__'
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
+    | '/api/public/telegram-test'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -207,6 +219,7 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
+  ApiPublicTelegramTestRoute: typeof ApiPublicTelegramTestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeliveryArchiveRouteImport
       parentRoute: typeof DeliveryRoute
     }
+    '/api/public/telegram-test': {
+      id: '/api/public/telegram-test'
+      path: '/api/public/telegram-test'
+      fullPath: '/api/public/telegram-test'
+      preLoaderRoute: typeof ApiPublicTelegramTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -359,17 +379,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,
+  ApiPublicTelegramTestRoute: ApiPublicTelegramTestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
