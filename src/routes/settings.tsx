@@ -63,15 +63,40 @@ function loadSettings(): AppSettings {
   }
 }
 
+const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
+  { kind: "order_new", label: "إشعار طلب جديد" },
+  { kind: "invoice_new", label: "إشعار تمت الفوترة" },
+  { kind: "delivery_start", label: "إشعار بدأ التوصيل" },
+  { kind: "delivery_done", label: "إشعار تم التسليم" },
+  { kind: "large_account", label: "إشعار الحسابات الكبيرة" },
+  { kind: "debt_reminder", label: "إشعار التذكير بالديون" },
+  { kind: "invoice_sent", label: "إشعار إرسال الفواتير عبر واتساب" },
+];
+
 function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [notifFlags, setNotifFlags] = useState<Record<string, boolean>>({});
+  const [notifLoaded, setNotifLoaded] = useState(false);
 
   useEffect(() => {
     setSettings(loadSettings());
     setLoaded(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("notification_settings")
+        .select("kind, enabled");
+      if (error) {
+        console.error("[settings:notifications]", error);
+      }
+      const map: Record<string, boolean> = {};
+      for (const k of NOTIFICATION_KINDS) map[k.kind] = true;
+      for (const row of data ?? []) map[(row as any).kind] = (row as any).enabled !== false;
+      setNotifFlags(map);
+      setNotifLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {
