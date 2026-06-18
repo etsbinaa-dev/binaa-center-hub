@@ -6,9 +6,11 @@ type Output = {
   customer_name: string | null;
   customer_phone: string | null;
   invoice_number: string | null;
+  amount: number | null;
   raw_text: string;
   error?: string;
 };
+
 
 const SYSTEM = `أنت تستخرج بيانات من صور فواتير عربية/إنجليزية.
 أعد JSON فقط بالحقول التالية بدون أي شرح:
