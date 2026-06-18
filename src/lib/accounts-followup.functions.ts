@@ -105,6 +105,57 @@ export const setInvoiceAmount = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// --- Apply payment (partial or full) ---
+export const applyInvoicePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        invoice_id: z.string().uuid(),
+        mode: z.enum(["partial", "full"]),
+        amount: z.number().positive().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const { data: inv, error: ie } = await context.supabase
+      .from("invoices")
+      .select("amount, paid_amount")
+      .eq("id", data.invoice_id)
+      .maybeSingle();
+    if (ie) throw new Error(ie.message);
+    if (!inv) throw new Error("Invoice not found");
+    const total = Number((inv as any).amount ?? 0);
+    const currentPaid = Number((inv as any).paid_amount ?? 0);
+    if (!Number.isFinite(total) || total <= 0) {
+      throw new Error("لا يمكن تسجيل دفعة قبل تحديد المبلغ الأصلي للفاتورة");
+    }
+    let newPaid: number;
+    if (data.mode === "full") {
+      newPaid = total;
+    } else {
+      const add = Number(data.amount ?? 0);
+      if (!Number.isFinite(add) || add <= 0) throw new Error("مبلغ غير صالح");
+      newPaid = Math.min(total, currentPaid + add);
+    }
+    const remaining = Math.max(0, total - newPaid);
+    const status = remaining <= 0 ? "paid" : newPaid > 0 ? "partial" : "unpaid";
+    const update = {
+      paid_amount: newPaid,
+      payment_status: status,
+      paid_at: status === "paid" ? new Date().toISOString() : null,
+    };
+    const { error } = await context.supabase
+      .from("invoices")
+      .update(update)
+      .eq("id", data.invoice_id);
+    if (error) throw new Error(error.message);
+    return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
+  });
+
+
+
 // --- Listing ---
 export const listMajorAccounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -121,7 +172,7 @@ export const listMajorAccounts = createServerFn({ method: "GET" })
     const { data: invoices, error } = await context.supabase
       .from("invoices")
       .select(
-        "id, customer_name, customer_phone, invoice_number, amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
+        "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
       )
       .eq("status", "sent")
       .gte("amount", threshold)

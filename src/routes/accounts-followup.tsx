@@ -16,6 +16,7 @@ import {
   setInvoiceAmount,
   respondReminder,
   runFollowupScanFn,
+  applyInvoicePayment,
 } from "@/lib/accounts-followup.functions";
 
 export const Route = createFileRoute("/accounts-followup")({
@@ -37,6 +38,7 @@ type Invoice = {
   customer_phone: string;
   invoice_number: string;
   amount: number | null;
+  paid_amount: number;
   payment_status: string;
   paid_at: string | null;
   last_reminder_at: string | null;
@@ -201,6 +203,7 @@ function normaliseInvoice(inv: unknown): Invoice | null {
       customer_phone: safeText(row.customer_phone, ""),
       invoice_number: safeText(row.invoice_number),
       amount,
+      paid_amount: safeNum(row.paid_amount),
       payment_status: safeText(row.payment_status, "unpaid"),
       paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
       last_reminder_at: typeof row.last_reminder_at === "string" ? row.last_reminder_at : null,
@@ -249,6 +252,7 @@ function AccountsFollowupPage() {
   const saveAmount = useServerFn(setInvoiceAmount);
   const respond = useServerFn(respondReminder);
   const runScan = useServerFn(runFollowupScanFn);
+  const applyPayment = useServerFn(applyInvoicePayment);
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -518,128 +522,225 @@ function AccountsFollowupPage() {
           );
         })()}
 
-        {/* Major invoices list */}
-        <Card className="p-4 space-y-3">
-          <h2 className="text-base font-bold">الحسابات الكبيرة</h2>
-          {loading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              لا توجد فواتير قابلة للعرض حالياً.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {invoices.map((inv) => {
-                try {
-                  const history = remindersByInvoice[inv.id] ?? [];
-                  const currentAmount = safeNum(inv.amount);
-                  return (
-                    <div key={inv.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-semibold">{inv.customer_name || "—"}</div>
-                          <div className="text-xs text-muted-foreground" dir="ltr">
-                            {inv.customer_phone || "—"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            فاتورة {inv.invoice_number || "—"} · {safeFormatDate(inv.created_at)}
-                          </div>
-                        </div>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                            inv.payment_status === "paid"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                          }`}
-                        >
-                          {inv.payment_status === "paid" ? "مدفوعة" : "غير مدفوعة"}
-                        </span>
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <div className="flex-1 space-y-1">
-                          <Label className="text-xs">المبلغ</Label>
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            value={amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount))}
-                            onChange={(e) =>
-                              setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
-                            }
-                          />
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            const raw = amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount));
-                            const num = raw === "" ? null : Number(raw);
-                            if (num !== null && (!Number.isFinite(num) || num < 0)) {
-                              toast.error("مبلغ غير صالح");
-                              return;
-                            }
-                            await saveAmount({ data: { invoice_id: inv.id, amount: num } });
-                            toast.success("تم حفظ المبلغ");
-                            reload();
-                          }}
-                        >
-                          حفظ
-                        </Button>
-                      </div>
-                      {history.length > 0 && (
-                        <details className="text-xs">
-                          <summary className="cursor-pointer text-muted-foreground">
-                            سجل التذكيرات ({history.length})
-                          </summary>
-                          <ul className="mt-2 space-y-1">
-                            {history.map((h) => {
-                              try {
-                                return (
-                                  <li key={h.id} className="rounded border bg-muted/30 p-2">
-                                    <div className="font-mono text-[10px] text-muted-foreground">
-                                      {safeFormatDateTime(h.created_at)}
-                                    </div>
-                                    <div>
-                                      الحالة:{" "}
-                                      {h.status === "paid"
-                                        ? "مدفوعة"
-                                        : h.status === "not_paid"
-                                          ? "غير مدفوعة"
-                                          : h.status === "snoozed"
-                                            ? "ذكّرني لاحقاً"
-                                            : "بانتظار الرد"}
-                                    </div>
-                                    {h.next_remind_at && (
-                                      <div className="text-muted-foreground">
-                                        التذكير التالي: {safeFormatDateTime(h.next_remind_at)}
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              } catch (err) {
-                                console.error("[followup] failed to render reminder history row", h, err);
-                                return null;
-                              }
-                            })}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                  );
-                } catch (err) {
-                  logFollowupError("render-invoice-row", err, {
-                    invoice_id: inv?.id,
-                    invoice: inv,
-                    field: "invoice-row",
-                  });
-                  return null;
-                }
-              })}
+        {/* Major invoices list — split into outstanding and fully paid */}
+        {(() => {
+          const outstanding = invoices.filter((i) => i.payment_status !== "paid");
+          const settled = invoices.filter((i) => i.payment_status === "paid");
 
-            </div>
-          )}
-        </Card>
+          const renderRow = (inv: Invoice) => {
+            try {
+              const history = remindersByInvoice[inv.id] ?? [];
+              const currentAmount = safeNum(inv.amount);
+              const paid = safeNum(inv.paid_amount);
+              const remaining = Math.max(0, currentAmount - paid);
+              const status = inv.payment_status;
+              const badge =
+                status === "paid"
+                  ? { cls: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200", dot: "🟢", text: "مدفوعة بالكامل" }
+                  : status === "partial"
+                    ? { cls: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200", dot: "🟠", text: "مدفوعة جزئياً" }
+                    : { cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", dot: "🟡", text: "غير مدفوعة" };
+              return (
+                <div key={inv.id} className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold">{inv.customer_name || "—"}</div>
+                      <div className="text-xs text-muted-foreground" dir="ltr">
+                        {inv.customer_phone || "—"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        فاتورة {inv.invoice_number || "—"} · {safeFormatDate(inv.created_at)}
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge.cls}`}>
+                      <span className="ml-1">{badge.dot}</span>
+                      {badge.text}
+                    </span>
+                  </div>
+
+                  {/* Amount summary: original / paid / remaining */}
+                  <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-center text-xs">
+                    <div>
+                      <div className="text-muted-foreground">المبلغ الأصلي</div>
+                      <div className="font-bold">{currentAmount.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">المدفوع</div>
+                      <div className="font-bold text-green-700 dark:text-green-300">{paid.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">المتبقي</div>
+                      <div className="font-bold text-amber-700 dark:text-amber-300">{remaining.toLocaleString()}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs">المبلغ الأصلي</Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        value={amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount))}
+                        onChange={(e) =>
+                          setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const raw = amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount));
+                        const num = raw === "" ? null : Number(raw);
+                        if (num !== null && (!Number.isFinite(num) || num < 0)) {
+                          toast.error("مبلغ غير صالح");
+                          return;
+                        }
+                        await saveAmount({ data: { invoice_id: inv.id, amount: num } });
+                        toast.success("تم حفظ المبلغ");
+                        reload();
+                      }}
+                    >
+                      حفظ
+                    </Button>
+                  </div>
+
+                  {status !== "paid" && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          if (!Number.isFinite(currentAmount) || currentAmount <= 0) {
+                            toast.error("حدد المبلغ الأصلي أولاً");
+                            return;
+                          }
+                          const input = window.prompt(
+                            `كم تم دفعه الآن؟ (المتبقي ${remaining.toLocaleString()})`,
+                          );
+                          if (input == null) return;
+                          const add = Number(input);
+                          if (!Number.isFinite(add) || add <= 0) {
+                            toast.error("مبلغ غير صالح");
+                            return;
+                          }
+                          try {
+                            await applyPayment({
+                              data: { invoice_id: inv.id, mode: "partial", amount: add },
+                            });
+                            toast.success("تم تسجيل الدفعة الجزئية");
+                            reload();
+                          } catch (e) {
+                            toast.error((e as Error)?.message ?? "تعذر تسجيل الدفعة");
+                          }
+                        }}
+                      >
+                        دفع جزئي
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          if (!Number.isFinite(currentAmount) || currentAmount <= 0) {
+                            toast.error("حدد المبلغ الأصلي أولاً");
+                            return;
+                          }
+                          if (!window.confirm("تأكيد تسجيل الفاتورة كمدفوعة بالكامل؟")) return;
+                          try {
+                            await applyPayment({
+                              data: { invoice_id: inv.id, mode: "full" },
+                            });
+                            toast.success("تم تسديد الفاتورة بالكامل");
+                            reload();
+                          } catch (e) {
+                            toast.error((e as Error)?.message ?? "تعذر تسجيل الدفعة");
+                          }
+                        }}
+                      >
+                        دفع كامل
+                      </Button>
+                    </div>
+                  )}
+
+                  {history.length > 0 && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        سجل التذكيرات ({history.length})
+                      </summary>
+                      <ul className="mt-2 space-y-1">
+                        {history.map((h) => {
+                          try {
+                            return (
+                              <li key={h.id} className="rounded border bg-muted/30 p-2">
+                                <div className="font-mono text-[10px] text-muted-foreground">
+                                  {safeFormatDateTime(h.created_at)}
+                                </div>
+                                <div>
+                                  الحالة:{" "}
+                                  {h.status === "paid"
+                                    ? "مدفوعة"
+                                    : h.status === "not_paid"
+                                      ? "غير مدفوعة"
+                                      : h.status === "snoozed"
+                                        ? "ذكّرني لاحقاً"
+                                        : "بانتظار الرد"}
+                                </div>
+                                {h.next_remind_at && (
+                                  <div className="text-muted-foreground">
+                                    التذكير التالي: {safeFormatDateTime(h.next_remind_at)}
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          } catch (err) {
+                            console.error("[followup] failed to render reminder history row", h, err);
+                            return null;
+                          }
+                        })}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              );
+            } catch (err) {
+              logFollowupError("render-invoice-row", err, {
+                invoice_id: inv?.id,
+                invoice: inv,
+                field: "invoice-row",
+              });
+              return null;
+            }
+          };
+
+          return (
+            <>
+              <Card className="p-4 space-y-3">
+                <h2 className="text-base font-bold">الحسابات الكبيرة</h2>
+                {loading ? (
+                  <div className="flex items-center justify-center py-10 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                ) : outstanding.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    لا توجد حسابات قائمة حالياً.
+                  </div>
+                ) : (
+                  <div className="space-y-3">{outstanding.map(renderRow)}</div>
+                )}
+              </Card>
+
+              {settled.length > 0 && (
+                <Card className="p-4 space-y-3">
+                  <details>
+                    <summary className="cursor-pointer text-base font-bold">
+                      الحسابات المسددة ({settled.length})
+                    </summary>
+                    <div className="mt-3 space-y-3">{settled.map(renderRow)}</div>
+                  </details>
+                </Card>
+              )}
+            </>
+          );
+        })()}
       </div>
     </AppShell>
   );
