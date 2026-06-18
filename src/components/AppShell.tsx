@@ -16,6 +16,7 @@ import {
   Building2,
   LogIn,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsBell } from "@/components/notifications-bell";
