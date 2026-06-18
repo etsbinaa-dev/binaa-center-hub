@@ -246,6 +246,24 @@ export type Database = {
           },
         ]
       }
+      notification_settings: {
+        Row: {
+          enabled: boolean
+          kind: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          kind: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          kind?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string

@@ -15,6 +15,7 @@ import {
   Check,
   Users,
   Shield,
+  Bell,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,15 +63,40 @@ function loadSettings(): AppSettings {
   }
 }
 
+const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
+  { kind: "order_new", label: "إشعار طلب جديد" },
+  { kind: "invoice_new", label: "إشعار تمت الفوترة" },
+  { kind: "delivery_start", label: "إشعار بدأ التوصيل" },
+  { kind: "delivery_done", label: "إشعار تم التسليم" },
+  { kind: "large_account", label: "إشعار الحسابات الكبيرة" },
+  { kind: "debt_reminder", label: "إشعار التذكير بالديون" },
+  { kind: "invoice_sent", label: "إشعار إرسال الفواتير عبر واتساب" },
+];
+
 function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [notifFlags, setNotifFlags] = useState<Record<string, boolean>>({});
+  const [notifLoaded, setNotifLoaded] = useState(false);
 
   useEffect(() => {
     setSettings(loadSettings());
     setLoaded(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("notification_settings")
+        .select("kind, enabled");
+      if (error) {
+        console.error("[settings:notifications]", error);
+      }
+      const map: Record<string, boolean> = {};
+      for (const k of NOTIFICATION_KINDS) map[k.kind] = true;
+      for (const row of data ?? []) map[(row as any).kind] = (row as any).enabled !== false;
+      setNotifFlags(map);
+      setNotifLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {
@@ -211,6 +237,22 @@ function SettingsPage() {
           .eq("status", "archived")
           .eq("delivery_status", "delivered"),
     );
+
+  const toggleNotif = async (kind: string) => {
+    const next = !(notifFlags[kind] ?? true);
+    setNotifFlags((prev) => ({ ...prev, [kind]: next }));
+    const { error } = await supabase
+      .from("notification_settings")
+      .upsert({ kind, enabled: next, updated_at: new Date().toISOString() }, { onConflict: "kind" });
+    if (error) {
+      console.error("[settings:notifications:save]", error);
+      setNotifFlags((prev) => ({ ...prev, [kind]: !next }));
+      setToast("تعذر حفظ الإعداد: " + error.message);
+    } else {
+      setToast(next ? "تم تفعيل الإشعار" : "تم إيقاف الإشعار");
+    }
+  };
+
 
   if (!loaded) {
     return (
@@ -372,6 +414,45 @@ function SettingsPage() {
           </label>
           <SaveButton />
         </form>
+      </Section>
+
+      {/* Notifications */}
+      <Section icon={<Bell className="h-5 w-5" />} title="إعدادات الإشعارات">
+        {!notifLoaded ? (
+          <p className="text-sm text-muted-foreground">جاري التحميل…</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="mb-2 text-xs text-muted-foreground">
+              يتم حفظ هذه الإعدادات في قاعدة البيانات وتطبيقها مباشرة على إشعارات تيليجرام.
+            </p>
+            {NOTIFICATION_KINDS.map((n) => {
+              const on = notifFlags[n.kind] ?? true;
+              return (
+                <label
+                  key={n.kind}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5"
+                >
+                  <span className="text-sm font-medium">{n.label}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    onClick={() => toggleNotif(n.kind)}
+                    className={`relative h-6 w-11 rounded-full transition ${
+                      on ? "bg-primary" : "bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                        on ? "start-0.5" : "end-0.5"
+                      }`}
+                    />
+                  </button>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </Section>
 
       {/* Backup */}

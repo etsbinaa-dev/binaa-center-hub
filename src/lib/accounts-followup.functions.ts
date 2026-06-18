@@ -25,6 +25,25 @@ function fmtTime(): string {
   }
 }
 
+async function isKindEnabled(supabaseAdmin: any, kind: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("notification_settings")
+      .select("enabled")
+      .eq("kind", kind)
+      .maybeSingle();
+    if (error) {
+      console.error("[followup:settings]", error);
+      return true;
+    }
+    if (!data) return true;
+    return data.enabled !== false;
+  } catch (e) {
+    console.error("[followup:settings]", e);
+    return true;
+  }
+}
+
 // --- Settings ---
 export const getFollowupSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -239,7 +258,11 @@ export async function runFollowupScan(supabaseAdmin: any) {
     ]
       .filter(Boolean)
       .join("\n");
-    const tg = await sendTelegram(tgText);
+    const enabled = await isKindEnabled(supabaseAdmin, "large_account");
+    const tg = enabled
+      ? await sendTelegram(tgText)
+      : { ok: false, sent: 0, errors: ["disabled"] };
+    if (!enabled) console.info("[followup] telegram skipped (disabled): large_account");
     if (tg.ok && ins?.id) {
       await supabaseAdmin
         .from("account_reminders")
@@ -295,7 +318,11 @@ export async function runFollowupScan(supabaseAdmin: any) {
     ]
       .filter(Boolean)
       .join("\n");
-    const tg = await sendTelegram(tgText);
+    const enabled2 = await isKindEnabled(supabaseAdmin, "debt_reminder");
+    const tg = enabled2
+      ? await sendTelegram(tgText)
+      : { ok: false, sent: 0, errors: ["disabled"] };
+    if (!enabled2) console.info("[followup] telegram skipped (disabled): debt_reminder");
     if (tg.ok && ins?.id) {
       await supabaseAdmin
         .from("account_reminders")
