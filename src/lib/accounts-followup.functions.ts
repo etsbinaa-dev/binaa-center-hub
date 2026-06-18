@@ -97,7 +97,7 @@ export const listMajorAccounts = createServerFn({ method: "GET" })
       .select("threshold_amount, initial_delay_days, snooze_days")
       .eq("id", 1)
       .maybeSingle();
-    const threshold = Number(settings.data?.threshold_amount ?? 50000);
+    const threshold = Number(((settings.data as any)?.threshold_amount) ?? 50000);
 
     const { data: invoices, error } = await context.supabase
       .from("invoices")
@@ -149,7 +149,7 @@ export const respondReminder = createServerFn({ method: "POST" })
       .select("snooze_days")
       .eq("id", 1)
       .maybeSingle();
-    const snoozeDays = Number(settings.data?.snooze_days ?? 3);
+    const snoozeDays = Number(((settings.data as any)?.snooze_days) ?? 3);
 
     const now = new Date();
     const update: any = {
@@ -174,7 +174,7 @@ export const respondReminder = createServerFn({ method: "POST" })
       await context.supabase
         .from("invoices")
         .update({ payment_status: "paid", paid_at: now.toISOString() })
-        .eq("id", rem.invoice_id);
+        .eq("id", (rem as any).invoice_id);
     }
     return { ok: true };
   });
