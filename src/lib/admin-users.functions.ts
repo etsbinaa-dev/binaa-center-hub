@@ -44,24 +44,37 @@ export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { email: string; password: string; full_name: string; role: AppRole }) =>
     z.object({
-      email: z.string().email().max(255),
+      email: z.string().trim().toLowerCase().email().max(255),
       password: z.string().min(6).max(72),
-      full_name: z.string().min(1).max(100),
+      full_name: z.string().trim().min(1).max(100),
       role: RoleSchema,
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
     await ensureAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
       user_metadata: { full_name: data.full_name },
     });
-    if (error) throw new Error(error.message);
-    if (created.user) await setRole(supabaseAdmin, created.user.id, data.role);
-    return { id: created.user?.id };
+    if (error) {
+      const msg = /already|registered|exists/i.test(error.message)
+        ? "هذا البريد الإلكتروني مسجل بالفعل"
+        : error.message;
+      throw new Error(msg);
+    }
+    if (!created.user) throw new Error("تعذّر إنشاء المستخدم");
+
+    // Ensure profile + role exist regardless of any trigger state.
+    await supabaseAdmin
+      .from("profiles")
+      .upsert({ id: created.user.id, full_name: data.full_name }, { onConflict: "id" });
+    await setRole(supabaseAdmin, created.user.id, data.role);
+
+    return { id: created.user.id, email: created.user.email ?? data.email };
   });
 
 export const updateUser = createServerFn({ method: "POST" })
