@@ -63,11 +63,14 @@ type Invoice = {
   customer_name: string;
   customer_phone: string;
   invoice_number: string;
+  amount: number | null;
+  amount_manual: boolean;
   image_path: string | null;
   status: "new" | "sent";
   sent_at: string | null;
   created_at: string;
 };
+
 
 export function InvoicesList({ status }: { status: "new" | "sent" }) {
   const { isAdmin } = useAuth();
