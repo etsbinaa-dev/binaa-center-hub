@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Loader2, Save, RefreshCcw, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Loader2, Save, RefreshCcw, CheckCircle2, XCircle, Clock, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   getFollowupSettings,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/accounts-followup.functions";
 
 export const Route = createFileRoute("/accounts-followup")({
-  head: () => ({ meta: [{ title: "متابعة الحسابات — بِناء HUB" }] }),
+  head: () => ({ meta: [{ title: "متابعة الدفع — بِناء HUB" }] }),
   component: AccountsFollowupPage,
 });
 
@@ -33,6 +33,7 @@ type Invoice = {
   paid_at: string | null;
   last_reminder_at: string | null;
   created_at: string;
+  sent_at: string | null;
 };
 type Reminder = {
   id: string;
@@ -97,7 +98,7 @@ function AccountsFollowupPage() {
   }, []);
 
   return (
-    <AppShell moduleKey="accounts_followup" title="متابعة الحسابات">
+    <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
       <div className="mx-auto max-w-3xl space-y-4 pb-12">
         {/* Settings */}
         <Card className="p-4 space-y-3">
