@@ -56,17 +56,26 @@ export function AppShell({
   title: string;
   children: ReactNode;
 }) {
-  const [role, setRoleState] = useState<Role>("admin");
+  const { user, role: authRole, loading: authLoading } = useAuth();
+  // Admin may preview other roles via the existing selector; non-admins are pinned to their auth role.
+  const [previewRole, setPreviewRoleState] = useState<Role | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    const stored = (typeof window !== "undefined" && localStorage.getItem("binaa.role")) as Role | null;
-    if (stored) setRoleState(stored);
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("binaa.role") as Role | null;
+    if (stored === "admin" || stored === "accountant" || stored === "delivery" || stored === "monitor") {
+      setPreviewRoleState(stored);
+    }
   }, []);
 
+  const isAdmin = authRole === "admin";
+  const role: Role = isAdmin ? (previewRole ?? "admin") : (authRole ?? "monitor");
+
   const setRole = (r: Role) => {
-    setRoleState(r);
+    if (!isAdmin) return;
+    setPreviewRoleState(r);
     if (typeof window !== "undefined") localStorage.setItem("binaa.role", r);
   };
 
@@ -74,6 +83,7 @@ export function AppShell({
 
   const allowed = canAccess(role, moduleKey);
   const items = NAV.filter((n) => canAccess(role, n.key));
+
 
   return (
     <RoleContext.Provider value={{ role, setRole }}>
