@@ -82,8 +82,8 @@ function AccountsFollowupPage() {
         initial_delay_days: Number(sx.initial_delay_days),
         snooze_days: Number(sx.snooze_days),
       });
-      setInvoices(l.invoices as Invoice[]);
-      setReminders(l.reminders as Reminder[]);
+      setInvoices(((l as any).invoices ?? []) as Invoice[]);
+      setReminders(((l as any).reminders ?? []) as Reminder[]);
     } catch (e: any) {
       toast.error(e?.message ?? "تعذر تحميل البيانات");
     } finally {
