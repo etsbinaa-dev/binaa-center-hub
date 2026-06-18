@@ -45,6 +45,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     typeof window !== "undefined" && window.location.pathname === "/accounts-followup";
   const errorMessage = error?.message ?? "Unknown error";
 
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
+
   if (isFollowupRoute) {
     console.error("[followup] root route fallback caught crash", {
       message: errorMessage,
@@ -78,10 +82,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       </div>
     );
   }
-
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
