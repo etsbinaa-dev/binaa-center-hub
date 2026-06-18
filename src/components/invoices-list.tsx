@@ -605,23 +605,35 @@ function EditDialog({
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [number, setNumber] = useState("");
+  const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (invoice) {
       setName(invoice.customer_name);
       setPhone(invoice.customer_phone);
-      setNumber(invoice.invoice_number);
+      setAmount(invoice.amount != null ? String(invoice.amount) : "");
     }
   }, [invoice]);
 
   async function save() {
     if (!invoice) return;
-    if (!name.trim() || !number.trim()) {
-      toast.error("الاسم ورقم الفاتورة مطلوبان");
+    if (!name.trim()) {
+      toast.error("اسم العميل مطلوب");
       return;
     }
+    const trimmedAmount = amount.trim();
+    let amountValue: number | null = null;
+    if (trimmedAmount !== "") {
+      const n = Number(trimmedAmount.replace(/,/g, ""));
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("المبلغ غير صالح");
+        return;
+      }
+      amountValue = n;
+    }
+    const amountChanged =
+      amountValue !== (invoice.amount == null ? null : Number(invoice.amount));
     setBusy(true);
     try {
       const { error } = await supabase
@@ -629,7 +641,8 @@ function EditDialog({
         .update({
           customer_name: name.trim(),
           customer_phone: phone.trim(),
-          invoice_number: number.trim(),
+          amount: amountValue,
+          ...(amountChanged ? { amount_manual: true } : {}),
         })
         .eq("id", invoice.id);
       if (error) throw error;
@@ -664,8 +677,19 @@ function EditDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label>رقم الفاتورة</Label>
-            <Input value={number} onChange={(e) => setNumber(e.target.value)} />
+            <Label>المبلغ المستحق</Label>
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              dir="ltr"
+              placeholder="0"
+            />
+            {invoice?.amount_manual && (
+              <p className="text-xs text-muted-foreground">
+                المبلغ معدّل يدوياً ولن يُستبدل عند إعادة الفحص.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -680,3 +704,4 @@ function EditDialog({
     </Dialog>
   );
 }
+
