@@ -470,11 +470,9 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
         <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">عميل جديد؟ أدخل بياناته أو اختره من جهات الاتصال</p>
-            {contactPickerSupported && (
-              <Button type="button" variant="outline" size="sm" onClick={pickFromContacts} className="shrink-0">
-                <Contact className="h-4 w-4 ml-1" />جهات الاتصال
-              </Button>
-            )}
+            <Button type="button" variant="outline" size="sm" onClick={pickFromContacts} className="shrink-0">
+              <Contact className="h-4 w-4 ml-1" />جهات الاتصال
+            </Button>
           </div>
           {contactsUnavailable && (
             <p className="text-[11px] text-muted-foreground">
