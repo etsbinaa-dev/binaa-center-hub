@@ -21,7 +21,8 @@ export type ActivityAction =
   | "delivered"
   | "save"
   | "enable"
-  | "disable";
+  | "disable"
+  | "reset_password";
 
 let cachedActor: { name: string; role: string | null } | null = null;
 
