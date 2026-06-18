@@ -238,6 +238,22 @@ function SettingsPage() {
           .eq("delivery_status", "delivered"),
     );
 
+  const toggleNotif = async (kind: string) => {
+    const next = !(notifFlags[kind] ?? true);
+    setNotifFlags((prev) => ({ ...prev, [kind]: next }));
+    const { error } = await supabase
+      .from("notification_settings")
+      .upsert({ kind, enabled: next, updated_at: new Date().toISOString() }, { onConflict: "kind" });
+    if (error) {
+      console.error("[settings:notifications:save]", error);
+      setNotifFlags((prev) => ({ ...prev, [kind]: !next }));
+      setToast("تعذر حفظ الإعداد: " + error.message);
+    } else {
+      setToast(next ? "تم تفعيل الإشعار" : "تم إيقاف الإشعار");
+    }
+  };
+
+
   if (!loaded) {
     return (
       <div className="py-12 text-center text-sm text-muted-foreground">
