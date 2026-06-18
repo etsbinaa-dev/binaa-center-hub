@@ -84,4 +84,5 @@ export const ACTIVITY_ACTION_LABELS: Record<ActivityAction, string> = {
   save: "حفظ",
   enable: "تفعيل",
   disable: "تعطيل",
+  reset_password: "إعادة تعيين كلمة المرور",
 };
