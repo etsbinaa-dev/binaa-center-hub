@@ -171,22 +171,40 @@ function QuantitiesPage() {
               </button>
               {open[s.category] && (
                 <div className="space-y-3 border-t border-border bg-muted/20 p-3 sm:p-4">
-                  {s.items.map((p) => {
+                  {[...s.items]
+                    .sort((a, b) => {
+                      const qa = values[a.key] ?? 0;
+                      const qb = values[b.key] ?? 0;
+                      const tier = (q: number) =>
+                        q <= LOW_STOCK_THRESHOLD ? 0 : q <= 50 ? 1 : 2;
+                      const ta = tier(qa);
+                      const tb = tier(qb);
+                      if (ta !== tb) return ta - tb;
+                      return qa - qb;
+                    })
+                    .map((p) => {
                     const qty = values[p.key];
-                    const low = qty <= 50;
+                    const critical = qty <= LOW_STOCK_THRESHOLD;
+                    const low = !critical && qty <= 50;
+                    const tone = critical
+                      ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
+                      : low
+                        ? "border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950"
+                        : "border-border bg-card";
                     return (
                       <div
                         key={p.key}
-                        className={`rounded-xl border p-4 shadow-sm transition-colors ${
-                          low
-                            ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
-                            : "border-border bg-card"
-                        }`}
+                        className={`rounded-xl border p-4 shadow-sm transition-colors ${tone}`}
                       >
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <h3 className="text-sm font-semibold sm:text-base">{p.label}</h3>
-                          {low && (
+                          {critical && (
                             <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-900 dark:text-red-200">
+                              مخزون حرج
+                            </span>
+                          )}
+                          {low && (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                               مخزون منخفض
                             </span>
                           )}
