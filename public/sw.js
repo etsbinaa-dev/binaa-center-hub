@@ -2,7 +2,7 @@
 // (Chrome/Android need a registered SW with a fetch handler).
 // Intentionally does NOT cache anything — pure pass-through to the network.
 
-const VERSION = "v1";
+const VERSION = "v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
