@@ -492,7 +492,9 @@ function AccountsFollowupPage() {
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : invoices.length === 0 ? (
-            <p className="text-sm text-muted-foreground">لا توجد فواتير تتجاوز الحد الحالي.</p>
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              لا توجد فواتير قابلة للعرض حالياً.
+            </div>
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => {
@@ -592,7 +594,11 @@ function AccountsFollowupPage() {
                     </div>
                   );
                 } catch (err) {
-                  console.error("[followup] failed to render invoice row", inv, err);
+                  logFollowupError("render-invoice-row", err, {
+                    invoice_id: inv?.id,
+                    invoice,
+                    field: "invoice-row",
+                  });
                   return null;
                 }
               })}
