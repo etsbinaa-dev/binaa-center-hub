@@ -166,6 +166,25 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
     const printed = toNumber(parsed.printed_total_max);
     const amount = handwritten ?? printed;
 
+    // Amount extraction:
+    // 1) Prefer handwritten amount anywhere in the invoice (blue/black pen, etc.).
+    // 2) If model marks handwritten confidence as "low", discard it.
+    // 3) Otherwise fall back to deterministic re-scan, then to printed AUM total.
+    const confidence = (parsed.handwritten_confidence as string | undefined)?.toLowerCase() ?? null;
+    const handwrittenFromModel =
+      confidence === "low" ? null : toNumber(parsed.handwritten_amount);
+    const handwrittenFromText = extractHandwrittenAmount(raw_text);
+    const handwritten = handwrittenFromModel ?? handwrittenFromText;
+    const printed = toNumber(parsed.printed_total_max);
+    const amount = handwritten ?? printed;
+    console.log("[extract-invoice] amount", {
+      handwrittenFromModel,
+      handwrittenFromText,
+      printed,
+      confidence,
+      chosen: amount,
+    });
+
     return {
       customer_name: (parsed.customer_name as string | undefined)?.toString().trim() || null,
       customer_phone: phoneFromClientLine,
