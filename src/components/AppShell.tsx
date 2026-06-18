@@ -56,17 +56,26 @@ export function AppShell({
   title: string;
   children: ReactNode;
 }) {
-  const [role, setRoleState] = useState<Role>("admin");
+  const { user, role: authRole, loading: authLoading } = useAuth();
+  // Admin may preview other roles via the existing selector; non-admins are pinned to their auth role.
+  const [previewRole, setPreviewRoleState] = useState<Role | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    const stored = (typeof window !== "undefined" && localStorage.getItem("binaa.role")) as Role | null;
-    if (stored) setRoleState(stored);
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("binaa.role") as Role | null;
+    if (stored === "admin" || stored === "accountant" || stored === "delivery" || stored === "monitor") {
+      setPreviewRoleState(stored);
+    }
   }, []);
 
+  const isAdmin = authRole === "admin";
+  const role: Role = isAdmin ? (previewRole ?? "admin") : (authRole ?? "monitor");
+
   const setRole = (r: Role) => {
-    setRoleState(r);
+    if (!isAdmin) return;
+    setPreviewRoleState(r);
     if (typeof window !== "undefined") localStorage.setItem("binaa.role", r);
   };
 
@@ -74,6 +83,7 @@ export function AppShell({
 
   const allowed = canAccess(role, moduleKey);
   const items = NAV.filter((n) => canAccess(role, n.key));
+
 
   return (
     <RoleContext.Provider value={{ role, setRole }}>
@@ -122,17 +132,22 @@ export function AppShell({
             <div className="ms-auto flex items-center gap-2">
               <NotificationsBell />
               <AuthControls />
-              <RoleSelect role={role} setRole={setRole} />
+              {isAdmin && <RoleSelect role={role} setRole={setRole} />}
             </div>
           </header>
 
           <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            {allowed ? (
+            {authLoading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">جاري التحميل…</div>
+            ) : !user ? (
+              <AccessDenied signInRequired />
+            ) : allowed ? (
               children
             ) : (
               <AccessDenied />
             )}
           </main>
+
         </div>
       </div>
     </RoleContext.Provider>
@@ -225,19 +240,33 @@ function RoleSelect({
   );
 }
 
-function AccessDenied() {
+function AccessDenied({ signInRequired = false }: { signInRequired?: boolean } = {}) {
   return (
     <div className="mx-auto mt-16 max-w-md rounded-2xl border border-border bg-card p-8 text-center">
       <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-destructive/10 text-destructive">
         <X className="h-6 w-6" />
       </div>
-      <h2 className="text-lg font-bold">لا تملك صلاحية الوصول</h2>
+      <h2 className="text-lg font-bold">
+        {signInRequired ? "يرجى تسجيل الدخول" : "لا تملك صلاحية الوصول"}
+      </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        هذه الوحدة غير متاحة لدورك الحالي. تواصل مع مدير النظام للحصول على الصلاحية.
+        {signInRequired
+          ? "هذه الصفحة تتطلب حساباً مفعّلاً. سجّل الدخول للمتابعة."
+          : "هذه الوحدة غير متاحة لدورك الحالي. تواصل مع مدير النظام للحصول على الصلاحية."}
       </p>
+      {signInRequired && (
+        <Link
+          to="/auth"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+        >
+          <LogIn className="h-4 w-4" />
+          تسجيل الدخول
+        </Link>
+      )}
     </div>
   );
 }
+
 
 function AuthControls() {
   const { user, signOut, loading } = useAuth();

@@ -21,7 +21,8 @@ export type ActivityAction =
   | "delivered"
   | "save"
   | "enable"
-  | "disable";
+  | "disable"
+  | "reset_password";
 
 let cachedActor: { name: string; role: string | null } | null = null;
 
@@ -83,4 +84,5 @@ export const ACTIVITY_ACTION_LABELS: Record<ActivityAction, string> = {
   save: "حفظ",
   enable: "تفعيل",
   disable: "تعطيل",
+  reset_password: "إعادة تعيين كلمة المرور",
 };

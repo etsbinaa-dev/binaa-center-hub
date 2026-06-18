@@ -1,0 +1,4 @@
+
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'accountant';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'delivery';
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'monitor';
