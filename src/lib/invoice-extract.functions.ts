@@ -19,13 +19,31 @@ const SYSTEM = `أنت تستخرج بيانات من صور فواتير عرب
   "invoice_number": "<رقم الفاتورة>" | null
 }
 
-قواعد صارمة لاستخراج بيانات العميل:
-1. ابحث في النص عن سطر يبدأ بكلمة "Client" (أو Client: أو العميل).
-2. اسم العميل = النص الموجود مباشرة بعد كلمة Client وقبل أول رقم.
-3. رقم واتساب العميل = الرقم المكون من 8 أرقام موجود مباشرة بعد اسم العميل في نفس السطر.
-4. لا تستخدم رقم الفاتورة أو أرقام المواد أو الكميات أو الأسعار أو التاريخ كرقم للعميل أبداً.
-5. إذا لم يوجد سطر يبدأ بـ Client، اجعل customer_name و customer_phone = null.
-6. raw_text يجب أن يحتوي على النص الكامل المستخرج كما هو (مهم للتشخيص).`;
+قواعد صارمة وإلزامية لاستخراج بيانات العميل (تعلو على أي منطق آخر):
+1. ابحث فقط عن السطر الذي يبدأ بكلمة "Client" (أو Client: أو العميل).
+2. اسم العميل = النص الموجود مباشرة بعد كلمة Client وقبل أول رقم في نفس السطر.
+3. رقم واتساب العميل = رقم موريتاني صالح مكوّن من 8 أرقام يبدأ بـ 2 أو 3 أو 4، موجود في نفس سطر Client فقط (مع تجاهل بادئة +222 أو 222 إن وُجدت).
+4. ممنوع منعاً باتاً استخراج رقم العميل من: رقم الفاتورة، كود العميل، أسطر المواد، الكميات، الأسعار، الإجماليات، التاريخ، أو أي سطر آخر.
+5. إذا لم يحتوِ سطر Client على رقم موريتاني صالح، اجعل customer_phone = null. لا تخمّن ولا تخترع رقماً أبداً.
+6. إذا لم يوجد سطر يبدأ بـ Client، اجعل customer_name و customer_phone = null.
+7. raw_text يجب أن يحتوي على النص الكامل المستخرج كما هو سطراً بسطر (إلزامي للتحقق).`;
+
+// Mauritanian phone: 8 digits starting with 2, 3 or 4. Optional +222/222 prefix.
+function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
+  if (!rawText) return null;
+  const lines = rawText.split(/\r?\n/);
+  const clientLine = lines.find((l) => /^\s*(client|العميل)\b/i.test(l));
+  if (!clientLine) return null;
+  // Strip the label so we don't accidentally match digits before "Client"
+  const afterLabel = clientLine.replace(/^\s*(client\s*:?|العميل\s*:?)/i, " ");
+  // Normalize: keep digits, +, and spaces/dashes as separators
+  const digits = afterLabel.replace(/[^\d+]/g, " ");
+  // Match: optional +222 / 222, then 8-digit number starting with 2/3/4
+  const re = /(?:\+?222)?\s*([234]\d{7})(?!\d)/g;
+  const m = re.exec(digits);
+  if (!m) return null;
+  return m[1];
+}
 
 export const extractInvoiceFields = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -96,11 +114,17 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         }
       }
     }
+
+    const raw_text = parsed.raw_text?.toString() ?? "";
+
+    // MANDATORY: phone must come from the "Client" line and be a valid Mauritanian number.
+    // This deterministic post-processing overrides any phone the model produced.
+    const phoneFromClientLine = extractMauritanianPhoneFromClientLine(raw_text);
+
     return {
       customer_name: parsed.customer_name?.toString().trim() || null,
-      customer_phone:
-        parsed.customer_phone?.toString().replace(/[^\d+]/g, "") || null,
+      customer_phone: phoneFromClientLine,
       invoice_number: parsed.invoice_number?.toString().trim() || null,
-      raw_text: parsed.raw_text?.toString() ?? "",
+      raw_text,
     };
   });

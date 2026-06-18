@@ -310,7 +310,7 @@ function InvoiceCard({
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Phone className="h-3.5 w-3.5" />
-          <span dir="ltr">{invoice.customer_phone || "—"}</span>
+          <span dir="ltr">{invoice.customer_phone || "No phone number found"}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Receipt className="h-3.5 w-3.5" />
@@ -486,6 +486,8 @@ function ImportDialog({
           if (!extracted.customer_name && !extracted.customer_phone) {
             missing++;
             toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+          } else if (!extracted.customer_phone) {
+            toast.warning(`${f.name}: No phone number found`);
           }
         } catch (e) {
           console.error("[invoice-extract] OCR failed for", f.name, e);
