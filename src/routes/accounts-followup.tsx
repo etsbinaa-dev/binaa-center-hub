@@ -252,6 +252,7 @@ function AccountsFollowupPage() {
   const saveAmount = useServerFn(setInvoiceAmount);
   const respond = useServerFn(respondReminder);
   const runScan = useServerFn(runFollowupScanFn);
+  const applyPayment = useServerFn(applyInvoicePayment);
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
