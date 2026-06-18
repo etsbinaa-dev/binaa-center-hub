@@ -13,6 +13,7 @@ import {
   Trash2,
   AlertTriangle,
   Check,
+  Users,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
