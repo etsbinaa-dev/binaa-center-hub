@@ -12,6 +12,7 @@ import {
   type PermissionMatrix,
 } from "@/hooks/use-permissions";
 import { type ModuleKey, type Role } from "@/lib/roles";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/permissions")({
   head: () => ({ meta: [{ title: "الصلاحيات — بِناء HUB" }] }),
@@ -50,11 +51,20 @@ const PERM_LABELS: Record<Permission, string> = {
 };
 
 function PermissionsPage() {
+  const { role: authRole } = useAuth();
   const { matrix, loaded, refresh } = usePermissions();
   const [draft, setDraft] = useState<PermissionMatrix | null>(null);
   const [activeRole, setActiveRole] = useState<Role>("accountant");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  if (authRole !== "admin") {
+    return (
+      <div className="mx-auto mt-12 max-w-md rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+        هذه الصفحة متاحة للمدير فقط.
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (loaded && !draft) {
