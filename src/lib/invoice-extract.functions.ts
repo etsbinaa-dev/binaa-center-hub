@@ -19,7 +19,8 @@ const SYSTEM = `أنت تستخرج بيانات من صور فواتير عرب
   "customer_name": "<اسم العميل>" | null,
   "customer_phone": "<رقم الواتساب للعميل>" | null,
   "invoice_number": "<رقم الفاتورة>" | null,
-  "handwritten_amount": "<الرقم المكتوب بخط اليد بعد To = أو TO = أو Total = أو TOTAL =>" | null,
+  "handwritten_amount": "<الرقم المكتوب بخط اليد في أي مكان من الفاتورة>" | null,
+  "handwritten_confidence": "high" | "medium" | "low" | null,
   "printed_total_max": "<أكبر رقم مطبوع تحت عمود Total أو Amount (AUM)>" | null
 }
 
@@ -30,9 +31,17 @@ const SYSTEM = `أنت تستخرج بيانات من صور فواتير عرب
 4. ممنوع استخراج رقم العميل من أي سطر آخر.
 5. إذا لم يحتوِ سطر Client على رقم موريتاني صالح، اجعل customer_phone = null.
 
-قواعد لاستخراج المبلغ:
-- handwritten_amount: ابحث في raw_text عن نص مكتوب بخط اليد يبدأ بـ "To =" أو "TO =" أو "Total =" أو "TOTAL =" (مع أو بدون مسافات) وأعد الرقم الذي يليه مباشرة. إن لم يوجد، اجعله null.
-- printed_total_max: أعد أكبر مبلغ مطبوع ظاهر في عمود Total أو Amount (AUM) داخل جدول الفاتورة. إن لم يوجد، اجعله null.
+قواعد لاستخراج المبلغ (مهمة جداً):
+- handwritten_amount: ابحث في كامل الصورة عن أي رقم مكتوب بخط اليد (غالباً بقلم أزرق أو أسود)، سواء بجانب "To =" أو "TO =" أو "Total =" أو "TOTAL =" أو "T=" أو بدون أي علامة، في أعلى الفاتورة أو أسفلها أو على الجانب.
+- ادعم خط اليد بالقلم الأزرق وتجاهل الأختام والتواقيع والشعارات تماماً.
+- اقبل النقاط والفواصل والمسافات داخل الرقم وأعد الأرقام فقط بدون فواصل:
+  • "To = 822950" → "822950"
+  • "4.550.000" → "4550000"
+  • "1 250 000" → "1250000"
+  • "Total = 75,000" → "75000"
+- إذا كان الرقم المكتوب بخط اليد غير واضح أو يحتمل أكثر من قراءة، اجعل handwritten_amount = null واجعل handwritten_confidence = "low".
+- إذا كان الرقم واضحاً تماماً اجعل handwritten_confidence = "high"، وإذا كان مقروءاً مع شك بسيط فاجعله "medium".
+- printed_total_max: أعد أكبر مبلغ مطبوع ظاهر في عمود Total أو Amount (AUM) داخل جدول الفاتورة كأرقام فقط بدون فواصل. إن لم يوجد، اجعله null.
 - raw_text يجب أن يحتوي على كل النصوص بما فيها المكتوبة بخط اليد.`;
 
 // Mauritanian phone: 8 digits starting with 2, 3 or 4. Optional +222/222 prefix.
@@ -49,18 +58,23 @@ function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
   return m[1];
 }
 
+// Parse an amount: strip dots, commas and spaces used as thousand separators,
+// keep digits only. "4.550.000" -> 4550000, "1 250 000" -> 1250000.
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
-  const s = String(v).replace(/[^\d.,-]/g, "").replace(/,/g, "");
-  if (!s) return null;
-  const n = parseFloat(s);
+  const raw = String(v).trim();
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const n = parseInt(digits, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Deterministic re-scan of raw_text for handwritten "To =" / "Total =" amounts.
+// Deterministic re-scan of raw_text for handwritten amount markers anywhere in
+// the text. Accepts dots/commas/spaces as separators; returns digits only.
 function extractHandwrittenAmount(rawText: string): number | null {
   if (!rawText) return null;
-  const re = /\b(?:to|total)\s*[=:]\s*([\d][\d.,\s]{0,20})/gi;
+  const re = /\b(?:to|total|t)\s*[=:]\s*([\d][\d.,\s]{2,30})/gi;
   let best: number | null = null;
   let m: RegExpExecArray | null;
   while ((m = re.exec(rawText)) !== null) {
@@ -145,12 +159,27 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
     const raw_text = (parsed.raw_text as string | undefined)?.toString() ?? "";
     const phoneFromClientLine = extractMauritanianPhoneFromClientLine(raw_text);
 
-    // Amount: prefer handwritten "To = / Total =" (model output then deterministic re-scan),
-    // fall back to largest printed total.
-    const handwritten =
-      toNumber(parsed.handwritten_amount) ?? extractHandwrittenAmount(raw_text);
+
+
+
+    // Amount extraction:
+    // 1) Prefer handwritten amount anywhere in the invoice (blue/black pen, etc.).
+    // 2) If model marks handwritten confidence as "low", discard it.
+    // 3) Otherwise fall back to deterministic re-scan, then to printed AUM total.
+    const confidence = (parsed.handwritten_confidence as string | undefined)?.toLowerCase() ?? null;
+    const handwrittenFromModel =
+      confidence === "low" ? null : toNumber(parsed.handwritten_amount);
+    const handwrittenFromText = extractHandwrittenAmount(raw_text);
+    const handwritten = handwrittenFromModel ?? handwrittenFromText;
     const printed = toNumber(parsed.printed_total_max);
     const amount = handwritten ?? printed;
+    console.log("[extract-invoice] amount", {
+      handwrittenFromModel,
+      handwrittenFromText,
+      printed,
+      confidence,
+      chosen: amount,
+    });
 
     return {
       customer_name: (parsed.customer_name as string | undefined)?.toString().trim() || null,
