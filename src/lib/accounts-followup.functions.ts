@@ -141,12 +141,11 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     }
     const remaining = Math.max(0, total - newPaid);
     const status = remaining <= 0 ? "paid" : newPaid > 0 ? "partial" : "unpaid";
-    const update: Record<string, unknown> = {
+    const update = {
       paid_amount: newPaid,
       payment_status: status,
+      paid_at: status === "paid" ? new Date().toISOString() : null,
     };
-    if (status === "paid") update.paid_at = new Date().toISOString();
-    else update.paid_at = null;
     const { error } = await context.supabase
       .from("invoices")
       .update(update)
@@ -154,6 +153,7 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
   });
+
 
 
 // --- Listing ---
