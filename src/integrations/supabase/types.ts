@@ -184,6 +184,7 @@ export type Database = {
       invoices: {
         Row: {
           amount: number | null
+          amount_manual: boolean
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -201,6 +202,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          amount_manual?: boolean
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -218,6 +220,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          amount_manual?: boolean
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
