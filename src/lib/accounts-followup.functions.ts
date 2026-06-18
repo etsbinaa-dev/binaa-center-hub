@@ -172,7 +172,7 @@ export const listMajorAccounts = createServerFn({ method: "GET" })
     const { data: invoices, error } = await context.supabase
       .from("invoices")
       .select(
-        "id, customer_name, customer_phone, invoice_number, amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
+        "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
       )
       .eq("status", "sent")
       .gte("amount", threshold)
