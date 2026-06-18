@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,6 +250,7 @@ function AccountsFollowupPage() {
   const respond = useServerFn(respondReminder);
   const runScan = useServerFn(runFollowupScanFn);
 
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<Settings>({
     threshold_amount: 50000,
@@ -270,6 +272,15 @@ function AccountsFollowupPage() {
   }, [reminders]);
 
   async function reload() {
+    // Guard: never call protected server fns without an authenticated session.
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session?.access_token) {
+      console.warn("[followup] reload skipped: no authenticated session");
+      setInvoices([]);
+      setReminders([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [s, l] = await Promise.all([fetchSettings(), fetchList()]);
@@ -302,7 +313,30 @@ function AccountsFollowupPage() {
   }
 
   useEffect(() => {
-    reload();
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (!data.session?.access_token) {
+        console.warn("[followup] no session — redirecting to /auth");
+        setLoading(false);
+        navigate({ to: "/auth" }).catch(() => {});
+        return;
+      }
+      reload();
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.access_token) {
+        setInvoices([]);
+        setReminders([]);
+      } else if (event === "SIGNED_IN") {
+        reload();
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
