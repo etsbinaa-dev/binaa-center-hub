@@ -76,10 +76,11 @@ function AccountsFollowupPage() {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([fetchSettings(), fetchList()]);
+      const sx = s as any;
       setSettings({
-        threshold_amount: Number(s.threshold_amount),
-        initial_delay_days: Number(s.initial_delay_days),
-        snooze_days: Number(s.snooze_days),
+        threshold_amount: Number(sx.threshold_amount),
+        initial_delay_days: Number(sx.initial_delay_days),
+        snooze_days: Number(sx.snooze_days),
       });
       setInvoices(l.invoices as Invoice[]);
       setReminders(l.reminders as Reminder[]);

@@ -19,6 +19,7 @@ import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as AccountsFollowupRouteImport } from './routes/accounts-followup'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OrdersArchiveRouteImport } from './routes/orders.archive'
 import { Route as InvoicesSentRouteImport } from './routes/invoices.sent'
@@ -75,6 +76,11 @@ const ActivityRoute = ActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountsFollowupRoute = AccountsFollowupRouteImport.update({
+  id: '/accounts-followup',
+  path: '/accounts-followup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -104,6 +110,7 @@ const ApiPublicHooksAccountsFollowupScanRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accounts-followup': typeof AccountsFollowupRoute
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accounts-followup': typeof AccountsFollowupRoute
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
@@ -139,6 +147,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accounts-followup': typeof AccountsFollowupRoute
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accounts-followup'
     | '/activity'
     | '/auth'
     | '/customers'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accounts-followup'
     | '/activity'
     | '/auth'
     | '/customers'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/accounts-followup'
     | '/activity'
     | '/auth'
     | '/customers'
@@ -210,6 +222,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountsFollowupRoute: typeof AccountsFollowupRoute
   ActivityRoute: typeof ActivityRoute
   AuthRoute: typeof AuthRoute
   CustomersRoute: typeof CustomersRoute
@@ -295,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accounts-followup': {
+      id: '/accounts-followup'
+      path: '/accounts-followup'
+      fullPath: '/accounts-followup'
+      preLoaderRoute: typeof AccountsFollowupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -370,6 +390,7 @@ const OrdersRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountsFollowupRoute: AccountsFollowupRoute,
   ActivityRoute: ActivityRoute,
   AuthRoute: AuthRoute,
   CustomersRoute: CustomersRoute,
