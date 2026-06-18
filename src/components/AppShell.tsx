@@ -132,17 +132,22 @@ export function AppShell({
             <div className="ms-auto flex items-center gap-2">
               <NotificationsBell />
               <AuthControls />
-              <RoleSelect role={role} setRole={setRole} />
+              {isAdmin && <RoleSelect role={role} setRole={setRole} />}
             </div>
           </header>
 
           <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            {allowed ? (
+            {authLoading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">جاري التحميل…</div>
+            ) : !user ? (
+              <AccessDenied signInRequired />
+            ) : allowed ? (
               children
             ) : (
               <AccessDenied />
             )}
           </main>
+
         </div>
       </div>
     </RoleContext.Provider>
