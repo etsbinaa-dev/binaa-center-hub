@@ -102,10 +102,11 @@ export const listMajorAccounts = createServerFn({ method: "GET" })
     const { data: invoices, error } = await context.supabase
       .from("invoices")
       .select(
-        "id, customer_name, customer_phone, invoice_number, amount, payment_status, paid_at, last_reminder_at, created_at",
+        "id, customer_name, customer_phone, invoice_number, amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
       )
+      .eq("status", "sent")
       .gte("amount", threshold)
-      .order("created_at", { ascending: false });
+      .order("sent_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const ids = (invoices ?? []).map((i: any) => i.id);
@@ -193,13 +194,15 @@ export async function runFollowupScan(supabaseAdmin: any) {
   const nowIso = now.toISOString();
   const cutoff = new Date(now.getTime() - initialDays * 86400000).toISOString();
 
-  // 1. Invoices that need a FIRST reminder
+  // 1. SENT invoices that need a FIRST reminder
   const { data: invoices } = await supabaseAdmin
     .from("invoices")
-    .select("id, customer_name, customer_phone, invoice_number, amount, created_at")
+    .select("id, customer_name, customer_phone, invoice_number, amount, created_at, sent_at")
     .gte("amount", threshold)
     .eq("payment_status", "unpaid")
-    .lte("created_at", cutoff);
+    .eq("status", "sent")
+    .not("sent_at", "is", null)
+    .lte("sent_at", cutoff);
 
   const created: any[] = [];
   for (const inv of invoices ?? []) {
