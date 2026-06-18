@@ -58,13 +58,8 @@ function PermissionsPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  if (authRole !== "admin") {
-    return (
-      <div className="mx-auto mt-12 max-w-md rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
-        هذه الصفحة متاحة للمدير فقط.
-      </div>
-    );
-  }
+  const isAdmin = authRole === "admin";
+
 
   useEffect(() => {
     if (loaded && !draft) {
@@ -118,6 +113,14 @@ function PermissionsPage() {
     await refresh();
     setToast("تم حفظ الصلاحيات");
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto mt-12 max-w-md rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+        هذه الصفحة متاحة للمدير فقط.
+      </div>
+    );
+  }
 
   if (!loaded || !draft) {
     return <div className="py-12 text-center text-sm text-muted-foreground">جاري التحميل…</div>;
