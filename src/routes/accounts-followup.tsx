@@ -37,6 +37,7 @@ type Invoice = {
   customer_phone: string;
   invoice_number: string;
   amount: number | null;
+  paid_amount: number;
   payment_status: string;
   paid_at: string | null;
   last_reminder_at: string | null;
