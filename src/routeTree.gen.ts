@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as InventoryRouteImport } from './routes/inventory'
@@ -21,7 +22,6 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsFollowupRouteImport } from './routes/accounts-followup'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
 import { Route as OrdersArchiveRouteImport } from './routes/orders.archive'
 import { Route as InvoicesSentRouteImport } from './routes/invoices.sent'
 import { Route as DeliveryArchiveRouteImport } from './routes/delivery.archive'
@@ -40,6 +40,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PermissionsRoute = PermissionsRouteImport.update({
+  id: '/permissions',
+  path: '/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -87,11 +92,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
-  id: '/permissions',
-  path: '/permissions',
-  getParentRoute: () => SettingsRoute,
-} as any)
 const OrdersArchiveRoute = OrdersArchiveRouteImport.update({
   id: '/archive',
   path: '/archive',
@@ -124,13 +124,13 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRouteWithChildren
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
-  '/settings/permissions': typeof SettingsPermissionsRoute
   '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRoutesByTo {
@@ -143,13 +143,13 @@ export interface FileRoutesByTo {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRouteWithChildren
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
-  '/settings/permissions': typeof SettingsPermissionsRoute
   '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRoutesById {
@@ -163,13 +163,13 @@ export interface FileRoutesById {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRouteWithChildren
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
   '/orders/archive': typeof OrdersArchiveRoute
-  '/settings/permissions': typeof SettingsPermissionsRoute
   '/api/public/hooks/accounts-followup-scan': typeof ApiPublicHooksAccountsFollowupScanRoute
 }
 export interface FileRouteTypes {
@@ -184,13 +184,13 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
-    | '/settings/permissions'
     | '/api/public/hooks/accounts-followup-scan'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -203,13 +203,13 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
-    | '/settings/permissions'
     | '/api/public/hooks/accounts-followup-scan'
   id:
     | '__root__'
@@ -222,13 +222,13 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
     | '/orders/archive'
-    | '/settings/permissions'
     | '/api/public/hooks/accounts-followup-scan'
   fileRoutesById: FileRoutesById
 }
@@ -242,8 +242,9 @@ export interface RootRouteChildren {
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
+  PermissionsRoute: typeof PermissionsRoute
   ReportsRoute: typeof ReportsRoute
-  SettingsRoute: typeof SettingsRouteWithChildren
+  SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
   ApiPublicHooksAccountsFollowupScanRoute: typeof ApiPublicHooksAccountsFollowupScanRoute
 }
@@ -269,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/permissions': {
+      id: '/permissions'
+      path: '/permissions'
+      fullPath: '/permissions'
+      preLoaderRoute: typeof PermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -333,13 +341,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/settings/permissions': {
-      id: '/settings/permissions'
-      path: '/permissions'
-      fullPath: '/settings/permissions'
-      preLoaderRoute: typeof SettingsPermissionsRouteImport
-      parentRoute: typeof SettingsRoute
     }
     '/orders/archive': {
       id: '/orders/archive'
@@ -407,18 +408,6 @@ const OrdersRouteChildren: OrdersRouteChildren = {
 const OrdersRouteWithChildren =
   OrdersRoute._addFileChildren(OrdersRouteChildren)
 
-interface SettingsRouteChildren {
-  SettingsPermissionsRoute: typeof SettingsPermissionsRoute
-}
-
-const SettingsRouteChildren: SettingsRouteChildren = {
-  SettingsPermissionsRoute: SettingsPermissionsRoute,
-}
-
-const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
-  SettingsRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsFollowupRoute: AccountsFollowupRoute,
@@ -429,8 +418,9 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
+  PermissionsRoute: PermissionsRoute,
   ReportsRoute: ReportsRoute,
-  SettingsRoute: SettingsRouteWithChildren,
+  SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,
   ApiPublicHooksAccountsFollowupScanRoute:
     ApiPublicHooksAccountsFollowupScanRoute,

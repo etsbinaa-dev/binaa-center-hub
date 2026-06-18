@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-permissions";
 import { type ModuleKey, type Role } from "@/lib/roles";
 
-export const Route = createFileRoute("/settings/permissions")({
+export const Route = createFileRoute("/permissions")({
   head: () => ({ meta: [{ title: "الصلاحيات — بِناء HUB" }] }),
   component: () => (
     <AppShell moduleKey="settings" title="الصلاحيات">
