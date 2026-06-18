@@ -32,7 +32,7 @@ function AuthPage() {
     setSubmitting(true);
     try {
       if (tab === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
         if (error) throw error;
         toast.success("تم تسجيل الدخول");
       } else {

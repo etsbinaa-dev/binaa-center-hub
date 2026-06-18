@@ -126,14 +126,17 @@ function UsersPage() {
         setToast("تم تحديث المستخدم");
         logActivity({ module: "users", action: "update", description: `تعديل المستخدم ${form.full_name}` });
       } else {
-        await fnCreate({ data: {
-          email: form.email.trim(),
-          password: form.password,
+        const normalizedEmail = form.email.trim().toLowerCase();
+        const pwd = form.password;
+        const res: any = await fnCreate({ data: {
+          email: normalizedEmail,
+          password: pwd,
           full_name: form.full_name.trim(),
           role: form.role,
         }});
-        setToast("تم إضافة المستخدم");
-        logActivity({ module: "users", action: "create", description: `إضافة المستخدم ${form.full_name}` });
+        const savedEmail = res?.email ?? normalizedEmail;
+        setToast(`تم إنشاء المستخدم (${savedEmail})`);
+        logActivity({ module: "users", action: "create", description: `إضافة المستخدم ${form.full_name} <${savedEmail}>` });
       }
       setOpen(false);
       await load();
