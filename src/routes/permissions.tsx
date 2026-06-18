@@ -40,6 +40,7 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   users: "المستخدمون",
   reports: "التقارير",
   accounts_followup: "متابعة الدفع",
+  daily_payments: "التحصيل اليومي",
   settings: "الإعدادات",
 };
 

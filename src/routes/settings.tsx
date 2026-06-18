@@ -71,6 +71,7 @@ const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
   { kind: "large_account", label: "إشعار الحسابات الكبيرة" },
   { kind: "debt_reminder", label: "إشعار التذكير بالديون" },
   { kind: "invoice_sent", label: "إشعار إرسال الفواتير عبر واتساب" },
+  { kind: "daily_payment", label: "إشعار التحصيل اليومي" },
 ];
 
 function SettingsPage() {

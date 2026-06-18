@@ -181,6 +181,48 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          customer_name: string
+          id: string
+          image_path: string | null
+          invoice_number: string | null
+          notes: string | null
+          payment_method: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_name: string
+          id?: string
+          image_path?: string | null
+          invoice_number?: string | null
+          notes?: string | null
+          payment_method: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          customer_name?: string
+          id?: string
+          image_path?: string | null
+          invoice_number?: string | null
+          notes?: string | null
+          payment_method?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number | null

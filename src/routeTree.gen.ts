@@ -17,6 +17,7 @@ import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as DeliveryRouteImport } from './routes/delivery'
+import { Route as DailyPaymentsRouteImport } from './routes/daily-payments'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ActivityRouteImport } from './routes/activity'
@@ -65,6 +66,11 @@ const InventoryRoute = InventoryRouteImport.update({
 const DeliveryRoute = DeliveryRouteImport.update({
   id: '/delivery',
   path: '/delivery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyPaymentsRoute = DailyPaymentsRouteImport.update({
+  id: '/daily-payments',
+  path: '/daily-payments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomersRoute = CustomersRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
+  '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
+  '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/auth': typeof AuthRoute
   '/customers': typeof CustomersRoute
+  '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/auth'
     | '/customers'
+    | '/daily-payments'
     | '/delivery'
     | '/inventory'
     | '/invoices'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/auth'
     | '/customers'
+    | '/daily-payments'
     | '/delivery'
     | '/inventory'
     | '/invoices'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/auth'
     | '/customers'
+    | '/daily-payments'
     | '/delivery'
     | '/inventory'
     | '/invoices'
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   AuthRoute: typeof AuthRoute
   CustomersRoute: typeof CustomersRoute
+  DailyPaymentsRoute: typeof DailyPaymentsRoute
   DeliveryRoute: typeof DeliveryRouteWithChildren
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/delivery'
       fullPath: '/delivery'
       preLoaderRoute: typeof DeliveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily-payments': {
+      id: '/daily-payments'
+      path: '/daily-payments'
+      fullPath: '/daily-payments'
+      preLoaderRoute: typeof DailyPaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customers': {
@@ -414,6 +434,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   AuthRoute: AuthRoute,
   CustomersRoute: CustomersRoute,
+  DailyPaymentsRoute: DailyPaymentsRoute,
   DeliveryRoute: DeliveryRouteWithChildren,
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,

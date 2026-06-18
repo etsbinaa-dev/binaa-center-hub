@@ -7,6 +7,7 @@ export type TelegramAlertKind =
   | "delivery_start"
   | "delivery_done"
   | "low_stock"
+  | "daily_payment"
   | "test";
 
 const HEADER: Record<TelegramAlertKind, string> = {
@@ -16,6 +17,7 @@ const HEADER: Record<TelegramAlertKind, string> = {
   delivery_start: "🚚 بدء التوصيل",
   delivery_done: "📦 تم التسليم",
   low_stock: "⚠️ مخزون منخفض",
+  daily_payment: "💵 تحصيل يومي جديد",
   test: "🔔 اختبار الاتصال",
 };
 
