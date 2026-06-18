@@ -143,7 +143,7 @@ function AccountsFollowupRoute() {
 
 function safeNum(v: unknown): number {
   if (v == null) return 0;
-  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 function safeDate(v: unknown): Date | null {
@@ -165,6 +165,79 @@ function safeFormatDateTime(v: unknown): string {
     return d ? d.toLocaleString("ar") : "—";
   } catch {
     return d ? d.toISOString() : "—";
+  }
+}
+
+function safeText(v: unknown, fallback = "—"): string {
+  if (typeof v === "string") return v.trim() || fallback;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return fallback;
+}
+
+function normaliseInvoice(inv: unknown): Invoice | null {
+  try {
+    if (!inv || typeof inv !== "object") {
+      console.warn("[followup] skipping corrupted invoice: not an object", inv);
+      return null;
+    }
+    const row = inv as Record<string, unknown>;
+    const id = safeText(row.id, "");
+    if (!id) {
+      console.warn("[followup] skipping corrupted invoice: missing id", inv);
+      return null;
+    }
+    const amount = safeNum(row.amount);
+    if (row.amount == null || !Number.isFinite(Number(row.amount))) {
+      console.warn("[followup] invoice amount missing or invalid; using 0", {
+        invoice_id: id,
+        field: "amount",
+        value: row.amount,
+      });
+    }
+    return {
+      id,
+      customer_name: safeText(row.customer_name),
+      customer_phone: safeText(row.customer_phone, ""),
+      invoice_number: safeText(row.invoice_number),
+      amount,
+      payment_status: safeText(row.payment_status, "unpaid"),
+      paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
+      last_reminder_at: typeof row.last_reminder_at === "string" ? row.last_reminder_at : null,
+      created_at: safeDate(row.created_at)?.toISOString() ?? "",
+      sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+    };
+  } catch (error) {
+    logFollowupError("normalise-invoice", error, { invoice: inv });
+    return null;
+  }
+}
+
+function normaliseReminder(reminder: unknown): Reminder | null {
+  try {
+    if (!reminder || typeof reminder !== "object") {
+      console.warn("[followup] skipping corrupted reminder: not an object", reminder);
+      return null;
+    }
+    const row = reminder as Record<string, unknown>;
+    const id = safeText(row.id, "");
+    const invoiceId = safeText(row.invoice_id, "");
+    if (!id || !invoiceId) {
+      console.warn("[followup] skipping corrupted reminder: missing id or invoice_id", reminder);
+      return null;
+    }
+    return {
+      id,
+      invoice_id: invoiceId,
+      status: safeText(row.status, "pending"),
+      message: safeText(row.message, ""),
+      due_at: safeDate(row.due_at)?.toISOString() ?? "",
+      responded_at: typeof row.responded_at === "string" ? row.responded_at : null,
+      next_remind_at: typeof row.next_remind_at === "string" ? row.next_remind_at : null,
+      created_at: safeDate(row.created_at)?.toISOString() ?? "",
+    };
+  } catch (error) {
+    logFollowupError("normalise-reminder", error, { reminder });
+    return null;
   }
 }
 
