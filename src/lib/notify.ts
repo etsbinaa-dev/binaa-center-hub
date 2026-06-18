@@ -20,6 +20,34 @@ const TELEGRAM_MAP: Partial<Record<NotificationType, TelegramAlertKind>> = {
   low_stock: "low_stock",
 };
 
+// Maps Telegram alert kind -> notification_settings.kind row
+const SETTINGS_KIND_MAP: Partial<Record<TelegramAlertKind, string>> = {
+  order_new: "order_new",
+  invoice_new: "invoice_new",
+  invoice_sent: "invoice_sent",
+  delivery_start: "delivery_start",
+  delivery_done: "delivery_done",
+};
+
+export async function isNotificationEnabled(kind: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("notification_settings")
+      .select("enabled")
+      .eq("kind", kind)
+      .maybeSingle();
+    if (error) {
+      console.error("[notify:settings]", error);
+      return true; // fail-open
+    }
+    if (!data) return true;
+    return data.enabled !== false;
+  } catch (e) {
+    console.error("[notify:settings]", e);
+    return true;
+  }
+}
+
 export async function notify(
   type: NotificationType,
   message: string,
@@ -38,6 +66,14 @@ export async function notify(
 
   const tgKind = TELEGRAM_MAP[type];
   if (tgKind) {
+    const settingsKind = SETTINGS_KIND_MAP[tgKind];
+    if (settingsKind) {
+      const enabled = await isNotificationEnabled(settingsKind);
+      if (!enabled) {
+        console.info(`[notify] telegram skipped (disabled): ${settingsKind}`);
+        return;
+      }
+    }
     sendTelegramAlert({ data: { kind: tgKind, message } }).catch((e) =>
       console.error("[notify:telegram]", e),
     );
