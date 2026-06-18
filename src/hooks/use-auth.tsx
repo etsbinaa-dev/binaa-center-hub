@@ -3,15 +3,17 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-
-export type AppRole = "admin" | "employee";
+import { normalizeRole, type Role } from "@/lib/roles";
 
 interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  role: AppRole | null;
+  /** Normalized app role (admin | accountant | delivery | monitor). null while loading. */
+  role: Role | null;
   isAdmin: boolean;
+  /** Refetch the role from the DB (useful right after an admin updates it). */
+  refreshRole: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -20,7 +22,7 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<AppRole | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -40,14 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
 
+  const fetchRole = async (uid: string): Promise<Role> => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid)
+      .maybeSingle();
+    return normalizeRole((data?.role as string | null) ?? null);
+  };
+
   useEffect(() => {
     if (!session?.user) { setRole(null); return; }
     let cancelled = false;
-    supabase.from("user_roles").select("role").eq("user_id", session.user.id).maybeSingle().then(({ data }) => {
-      if (!cancelled) setRole((data?.role as AppRole) ?? "employee");
-    });
+    fetchRole(session.user.id).then((r) => { if (!cancelled) setRole(r); });
     return () => { cancelled = true; };
   }, [session?.user?.id]);
+
+  const refreshRole = async () => {
+    if (!session?.user) return;
+    setRole(await fetchRole(session.user.id));
+  };
 
   const signOut = async () => {
     await queryClient.cancelQueries();
@@ -63,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       role,
       isAdmin: role === "admin",
+      refreshRole,
       signOut,
     }}>
       {children}
