@@ -240,19 +240,33 @@ function RoleSelect({
   );
 }
 
-function AccessDenied() {
+function AccessDenied({ signInRequired = false }: { signInRequired?: boolean } = {}) {
   return (
     <div className="mx-auto mt-16 max-w-md rounded-2xl border border-border bg-card p-8 text-center">
       <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-destructive/10 text-destructive">
         <X className="h-6 w-6" />
       </div>
-      <h2 className="text-lg font-bold">لا تملك صلاحية الوصول</h2>
+      <h2 className="text-lg font-bold">
+        {signInRequired ? "يرجى تسجيل الدخول" : "لا تملك صلاحية الوصول"}
+      </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        هذه الوحدة غير متاحة لدورك الحالي. تواصل مع مدير النظام للحصول على الصلاحية.
+        {signInRequired
+          ? "هذه الصفحة تتطلب حساباً مفعّلاً. سجّل الدخول للمتابعة."
+          : "هذه الوحدة غير متاحة لدورك الحالي. تواصل مع مدير النظام للحصول على الصلاحية."}
       </p>
+      {signInRequired && (
+        <Link
+          to="/auth"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+        >
+          <LogIn className="h-4 w-4" />
+          تسجيل الدخول
+        </Link>
+      )}
     </div>
   );
 }
+
 
 function AuthControls() {
   const { user, signOut, loading } = useAuth();
