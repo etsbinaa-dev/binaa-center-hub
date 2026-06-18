@@ -202,6 +202,7 @@ function normaliseInvoice(inv: unknown): Invoice | null {
       customer_phone: safeText(row.customer_phone, ""),
       invoice_number: safeText(row.invoice_number),
       amount,
+      paid_amount: safeNum(row.paid_amount),
       payment_status: safeText(row.payment_status, "unpaid"),
       paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
       last_reminder_at: typeof row.last_reminder_at === "string" ? row.last_reminder_at : null,
