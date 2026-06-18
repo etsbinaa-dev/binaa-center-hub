@@ -16,7 +16,7 @@ async function ensureAdmin(ctx: { supabase: any; userId: string }) {
 function fmtTime(): string {
   try {
     return new Intl.DateTimeFormat("ar", {
-      timeZone: "Asia/Riyadh",
+      timeZone: "Africa/Nouakchott",
       dateStyle: "short",
       timeStyle: "short",
     }).format(new Date());
