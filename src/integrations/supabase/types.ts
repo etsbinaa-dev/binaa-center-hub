@@ -194,6 +194,7 @@ export type Database = {
           image_path: string | null
           invoice_number: string
           last_reminder_at: string | null
+          paid_amount: number
           paid_at: string | null
           payment_status: string
           sent_at: string | null
@@ -212,6 +213,7 @@ export type Database = {
           image_path?: string | null
           invoice_number: string
           last_reminder_at?: string | null
+          paid_amount?: number
           paid_at?: string | null
           payment_status?: string
           sent_at?: string | null
@@ -230,6 +232,7 @@ export type Database = {
           image_path?: string | null
           invoice_number?: string
           last_reminder_at?: string | null
+          paid_amount?: number
           paid_at?: string | null
           payment_status?: string
           sent_at?: string | null
