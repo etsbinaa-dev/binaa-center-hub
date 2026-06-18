@@ -478,6 +478,7 @@ function ImportDialog({
         let customer_name = "غير معروف";
         let customer_phone = "";
         let invoice_number = fallbackInv;
+        let amount: number | null = null;
 
         try {
           const extracted = await extractFromFile(f);
@@ -486,12 +487,14 @@ function ImportDialog({
             customer_name: extracted.customer_name,
             customer_phone: extracted.customer_phone,
             invoice_number: extracted.invoice_number,
+            amount: extracted.amount,
             error: extracted.error,
           });
 
           if (extracted.customer_name) customer_name = extracted.customer_name;
           if (extracted.customer_phone) customer_phone = extracted.customer_phone;
           if (extracted.invoice_number) invoice_number = extracted.invoice_number;
+          if (extracted.amount != null) amount = extracted.amount;
 
           if (!extracted.customer_name && !extracted.customer_phone) {
             missing++;
@@ -510,12 +513,14 @@ function ImportDialog({
             customer_name,
             customer_phone,
             invoice_number,
+            amount,
             image_path: path,
             status: "new",
             created_by: user?.id ?? null,
           });
           if (error) throw error;
           ok++;
+
         } catch (e) {
           failed++;
           console.error("[invoice-extract] save failed", f.name, e);
