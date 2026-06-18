@@ -159,12 +159,8 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
     const raw_text = (parsed.raw_text as string | undefined)?.toString() ?? "";
     const phoneFromClientLine = extractMauritanianPhoneFromClientLine(raw_text);
 
-    // Amount: prefer handwritten "To = / Total =" (model output then deterministic re-scan),
-    // fall back to largest printed total.
-    const handwritten =
-      toNumber(parsed.handwritten_amount) ?? extractHandwrittenAmount(raw_text);
-    const printed = toNumber(parsed.printed_total_max);
-    const amount = handwritten ?? printed;
+
+
 
     // Amount extraction:
     // 1) Prefer handwritten amount anywhere in the invoice (blue/black pen, etc.).
