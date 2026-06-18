@@ -35,7 +35,8 @@ export type ModuleKey =
   | "users"
   | "reports"
   | "settings"
-  | "accounts_followup";
+  | "accounts_followup"
+  | "daily_payments";
 
 export const MODULE_ACCESS: Record<ModuleKey, Role[]> = {
   home: ["admin", "accountant", "delivery", "monitor"],
@@ -48,6 +49,7 @@ export const MODULE_ACCESS: Record<ModuleKey, Role[]> = {
   reports: ["admin", "accountant", "monitor"],
   settings: ["admin"],
   accounts_followup: ["admin"],
+  daily_payments: ["admin", "accountant"],
 };
 
 export function canAccess(role: Role, moduleKey: ModuleKey): boolean {
