@@ -596,7 +596,7 @@ function AccountsFollowupPage() {
                 } catch (err) {
                   logFollowupError("render-invoice-row", err, {
                     invoice_id: inv?.id,
-                    invoice,
+                    invoice: inv,
                     field: "invoice-row",
                   });
                   return null;
