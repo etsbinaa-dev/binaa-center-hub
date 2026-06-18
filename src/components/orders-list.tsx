@@ -208,7 +208,25 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
                 </div>
               </div>
               {o.details && o.details.trim() && (
-                <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2">{o.details}</p>
+                <div className="text-sm bg-muted/50 rounded-md p-2 flex flex-col">
+                  {o.details.split("\n").map((line, i) => {
+                    const hasArabic = /[\u0600-\u06FF]/.test(line);
+                    const isLatin = !hasArabic && /[A-Za-z]/.test(line);
+                    return (
+                      <span
+                        key={i}
+                        className="block whitespace-pre-wrap"
+                        style={
+                          isLatin
+                            ? { direction: "ltr", textAlign: "left", unicodeBidi: "isolate" }
+                            : { direction: "rtl", textAlign: "right", unicodeBidi: "isolate" }
+                        }
+                      >
+                        {line || "\u00A0"}
+                      </span>
+                    );
+                  })}
+                </div>
               )}
               <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
               <div className="flex justify-end gap-2 pt-1">
