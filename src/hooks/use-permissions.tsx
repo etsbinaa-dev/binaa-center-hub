@@ -16,6 +16,7 @@ const MODULES: ModuleKey[] = [
   "users",
   "reports",
   "accounts_followup",
+  "daily_payments",
   "settings",
 ];
 
