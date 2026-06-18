@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,14 @@ import {
 
 export const Route = createFileRoute("/accounts-followup")({
   head: () => ({ meta: [{ title: "متابعة الدفع — بِناء HUB" }] }),
-  component: AccountsFollowupPage,
+  component: AccountsFollowupRoute,
+  errorComponent: ({ error, reset }) => (
+    <FollowupErrorFallback
+      error={error}
+      onReset={reset}
+      source="route-error-component"
+    />
+  ),
 });
 
 type Settings = { threshold_amount: number; initial_delay_days: number; snooze_days: number };
@@ -46,9 +53,97 @@ type Reminder = {
   created_at: string;
 };
 
+const EMPTY_LIST: unknown[] = [];
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown Follow-up page error";
+  }
+}
+
+function logFollowupError(source: string, error: unknown, details?: Record<string, unknown>) {
+  const message = getErrorMessage(error);
+  console.error(`[followup] ${source}: ${message}`, { error, ...details });
+}
+
+function FollowupErrorFallback({
+  error,
+  onReset,
+  source,
+}: {
+  error: unknown;
+  onReset?: () => void;
+  source: string;
+}) {
+  const message = getErrorMessage(error);
+  logFollowupError(source, error);
+  return (
+    <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
+      <div className="mx-auto max-w-3xl pb-12">
+        <Card className="space-y-3 p-4">
+          <h2 className="text-base font-bold">تعذر عرض متابعة الدفع</h2>
+          <p className="text-sm text-muted-foreground">
+            تم منع انهيار الصفحة. لا توجد بيانات قابلة للعرض حالياً.
+          </p>
+          <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs text-muted-foreground" dir="ltr">
+            {message || "Unknown error"}
+          </pre>
+          {onReset && (
+            <Button size="sm" variant="outline" onClick={onReset}>
+              <RefreshCcw className="h-4 w-4 ml-1" /> إعادة المحاولة
+            </Button>
+          )}
+        </Card>
+      </div>
+    </AppShell>
+  );
+}
+
+class FollowupPageErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: unknown | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    logFollowupError("react-error-boundary", error, {
+      componentStack: info.componentStack,
+    });
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <FollowupErrorFallback
+          error={this.state.error}
+          source="react-error-boundary-fallback"
+          onReset={() => this.setState({ error: null })}
+        />
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AccountsFollowupRoute() {
+  return (
+    <FollowupPageErrorBoundary>
+      <AccountsFollowupPage />
+    </FollowupPageErrorBoundary>
+  );
+}
+
 function safeNum(v: unknown): number {
   if (v == null) return 0;
-  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 function safeDate(v: unknown): Date | null {
@@ -70,6 +165,79 @@ function safeFormatDateTime(v: unknown): string {
     return d ? d.toLocaleString("ar") : "—";
   } catch {
     return d ? d.toISOString() : "—";
+  }
+}
+
+function safeText(v: unknown, fallback = "—"): string {
+  if (typeof v === "string") return v.trim() || fallback;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return fallback;
+}
+
+function normaliseInvoice(inv: unknown): Invoice | null {
+  try {
+    if (!inv || typeof inv !== "object") {
+      console.warn("[followup] skipping corrupted invoice: not an object", inv);
+      return null;
+    }
+    const row = inv as Record<string, unknown>;
+    const id = safeText(row.id, "");
+    if (!id) {
+      console.warn("[followup] skipping corrupted invoice: missing id", inv);
+      return null;
+    }
+    const amount = safeNum(row.amount);
+    if (row.amount == null || !Number.isFinite(Number(row.amount))) {
+      console.warn("[followup] invoice amount missing or invalid; using 0", {
+        invoice_id: id,
+        field: "amount",
+        value: row.amount,
+      });
+    }
+    return {
+      id,
+      customer_name: safeText(row.customer_name),
+      customer_phone: safeText(row.customer_phone, ""),
+      invoice_number: safeText(row.invoice_number),
+      amount,
+      payment_status: safeText(row.payment_status, "unpaid"),
+      paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
+      last_reminder_at: typeof row.last_reminder_at === "string" ? row.last_reminder_at : null,
+      created_at: safeDate(row.created_at)?.toISOString() ?? "",
+      sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+    };
+  } catch (error) {
+    logFollowupError("normalise-invoice", error, { invoice: inv });
+    return null;
+  }
+}
+
+function normaliseReminder(reminder: unknown): Reminder | null {
+  try {
+    if (!reminder || typeof reminder !== "object") {
+      console.warn("[followup] skipping corrupted reminder: not an object", reminder);
+      return null;
+    }
+    const row = reminder as Record<string, unknown>;
+    const id = safeText(row.id, "");
+    const invoiceId = safeText(row.invoice_id, "");
+    if (!id || !invoiceId) {
+      console.warn("[followup] skipping corrupted reminder: missing id or invoice_id", reminder);
+      return null;
+    }
+    return {
+      id,
+      invoice_id: invoiceId,
+      status: safeText(row.status, "pending"),
+      message: safeText(row.message, ""),
+      due_at: safeDate(row.due_at)?.toISOString() ?? "",
+      responded_at: typeof row.responded_at === "string" ? row.responded_at : null,
+      next_remind_at: typeof row.next_remind_at === "string" ? row.next_remind_at : null,
+      created_at: safeDate(row.created_at)?.toISOString() ?? "",
+    };
+  } catch (error) {
+    logFollowupError("normalise-reminder", error, { reminder });
+    return null;
   }
 }
 
@@ -111,27 +279,22 @@ function AccountsFollowupPage() {
         initial_delay_days: safeNum(sx.initial_delay_days) || 2,
         snooze_days: safeNum(sx.snooze_days) || 3,
       });
-      const rawInvoices = ((l as { invoices?: unknown[] })?.invoices ?? []) as Invoice[];
-      // Drop entries missing an id, normalise amount to a safe number, log skips.
-      const cleanInvoices: Invoice[] = [];
-      for (const inv of rawInvoices) {
-        try {
-          if (!inv || !inv.id) {
-            console.warn("[followup] skipping invoice without id", inv);
-            continue;
-          }
-          cleanInvoices.push({
-            ...inv,
-            amount: inv.amount == null ? 0 : safeNum(inv.amount),
-          });
-        } catch (err) {
-          console.error("[followup] failed to normalise invoice", inv, err);
-        }
-      }
+      const listPayload = (l as { invoices?: unknown[]; reminders?: unknown[] }) ?? {};
+      const rawInvoices = Array.isArray(listPayload.invoices) ? listPayload.invoices : EMPTY_LIST;
+      const cleanInvoices = rawInvoices
+        .map((inv) => normaliseInvoice(inv))
+        .filter((inv): inv is Invoice => Boolean(inv));
       setInvoices(cleanInvoices);
-      setReminders(((l as { reminders?: unknown[] })?.reminders ?? []) as Reminder[]);
+      const rawReminders = Array.isArray(listPayload.reminders) ? listPayload.reminders : EMPTY_LIST;
+      setReminders(
+        rawReminders
+          .map((reminder) => normaliseReminder(reminder))
+          .filter((reminder): reminder is Reminder => Boolean(reminder)),
+      );
     } catch (e) {
-      console.error("[followup] reload failed", e);
+      logFollowupError("reload", e);
+      setInvoices([]);
+      setReminders([]);
       toast.error((e as Error)?.message ?? "تعذر تحميل البيانات");
     } finally {
       setLoading(false);
@@ -329,7 +492,9 @@ function AccountsFollowupPage() {
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : invoices.length === 0 ? (
-            <p className="text-sm text-muted-foreground">لا توجد فواتير تتجاوز الحد الحالي.</p>
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              لا توجد فواتير قابلة للعرض حالياً.
+            </div>
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => {
@@ -429,7 +594,11 @@ function AccountsFollowupPage() {
                     </div>
                   );
                 } catch (err) {
-                  console.error("[followup] failed to render invoice row", inv, err);
+                  logFollowupError("render-invoice-row", err, {
+                    invoice_id: inv?.id,
+                    invoice: inv,
+                    field: "invoice-row",
+                  });
                   return null;
                 }
               })}

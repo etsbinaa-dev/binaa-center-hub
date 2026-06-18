@@ -41,9 +41,47 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const isFollowupRoute =
+    typeof window !== "undefined" && window.location.pathname === "/accounts-followup";
+  const errorMessage = error?.message ?? "Unknown error";
+
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
+
+  if (isFollowupRoute) {
+    console.error("[followup] root route fallback caught crash", {
+      message: errorMessage,
+      error,
+    });
+    return (
+      <div dir="rtl" className="min-h-screen bg-background p-4 text-foreground sm:p-6">
+        <div className="mx-auto max-w-3xl space-y-4">
+          <header className="border-b border-border pb-4">
+            <h1 className="text-xl font-bold">متابعة الدفع</h1>
+          </header>
+          <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <h2 className="text-base font-bold">لا توجد بيانات قابلة للعرض حالياً</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              تم منع انهيار الصفحة. حدث خطأ أثناء تحميل صفحة المتابعة، لذلك يتم عرض حالة فارغة بدلاً من شاشة بيضاء.
+            </p>
+            <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs text-muted-foreground" dir="ltr">
+              {errorMessage}
+            </pre>
+            <button
+              onClick={() => {
+                router.invalidate();
+                reset();
+              }}
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              إعادة المحاولة
+            </button>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
