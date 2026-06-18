@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,14 @@ import {
 
 export const Route = createFileRoute("/accounts-followup")({
   head: () => ({ meta: [{ title: "متابعة الدفع — بِناء HUB" }] }),
-  component: AccountsFollowupPage,
+  component: AccountsFollowupRoute,
+  errorComponent: ({ error, reset }) => (
+    <FollowupErrorFallback
+      error={error}
+      onReset={reset}
+      source="route-error-component"
+    />
+  ),
 });
 
 type Settings = { threshold_amount: number; initial_delay_days: number; snooze_days: number };
@@ -45,6 +52,94 @@ type Reminder = {
   next_remind_at: string | null;
   created_at: string;
 };
+
+const EMPTY_LIST: unknown[] = [];
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown Follow-up page error";
+  }
+}
+
+function logFollowupError(source: string, error: unknown, details?: Record<string, unknown>) {
+  const message = getErrorMessage(error);
+  console.error(`[followup] ${source}: ${message}`, { error, ...details });
+}
+
+function FollowupErrorFallback({
+  error,
+  onReset,
+  source,
+}: {
+  error: unknown;
+  onReset?: () => void;
+  source: string;
+}) {
+  const message = getErrorMessage(error);
+  logFollowupError(source, error);
+  return (
+    <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
+      <div className="mx-auto max-w-3xl pb-12">
+        <Card className="space-y-3 p-4">
+          <h2 className="text-base font-bold">تعذر عرض متابعة الدفع</h2>
+          <p className="text-sm text-muted-foreground">
+            تم منع انهيار الصفحة. لا توجد بيانات قابلة للعرض حالياً.
+          </p>
+          <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 text-xs text-muted-foreground" dir="ltr">
+            {message || "Unknown error"}
+          </pre>
+          {onReset && (
+            <Button size="sm" variant="outline" onClick={onReset}>
+              <RefreshCcw className="h-4 w-4 ml-1" /> إعادة المحاولة
+            </Button>
+          )}
+        </Card>
+      </div>
+    </AppShell>
+  );
+}
+
+class FollowupPageErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: unknown | null }
+> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    logFollowupError("react-error-boundary", error, {
+      componentStack: info.componentStack,
+    });
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <FollowupErrorFallback
+          error={this.state.error}
+          source="react-error-boundary-fallback"
+          onReset={() => this.setState({ error: null })}
+        />
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AccountsFollowupRoute() {
+  return (
+    <FollowupPageErrorBoundary>
+      <AccountsFollowupPage />
+    </FollowupPageErrorBoundary>
+  );
+}
 
 function safeNum(v: unknown): number {
   if (v == null) return 0;
