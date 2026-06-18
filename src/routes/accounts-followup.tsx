@@ -46,6 +46,33 @@ type Reminder = {
   created_at: string;
 };
 
+function safeNum(v: unknown): number {
+  if (v == null) return 0;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+function safeDate(v: unknown): Date | null {
+  if (!v) return null;
+  const d = new Date(v as string);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+function safeFormatDate(v: unknown): string {
+  const d = safeDate(v);
+  try {
+    return d ? d.toLocaleDateString("ar") : "—";
+  } catch {
+    return d ? d.toISOString().slice(0, 10) : "—";
+  }
+}
+function safeFormatDateTime(v: unknown): string {
+  const d = safeDate(v);
+  try {
+    return d ? d.toLocaleString("ar") : "—";
+  } catch {
+    return d ? d.toISOString() : "—";
+  }
+}
+
 function AccountsFollowupPage() {
   const fetchSettings = useServerFn(getFollowupSettings);
   const saveSettings = useServerFn(updateFollowupSettings);
@@ -68,6 +95,7 @@ function AccountsFollowupPage() {
   const remindersByInvoice = useMemo(() => {
     const m: Record<string, Reminder[]> = {};
     for (const r of reminders) {
+      if (!r || !r.invoice_id) continue;
       (m[r.invoice_id] ||= []).push(r);
     }
     return m;
@@ -77,16 +105,34 @@ function AccountsFollowupPage() {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([fetchSettings(), fetchList()]);
-      const sx = s as any;
+      const sx = (s as Record<string, unknown>) ?? {};
       setSettings({
-        threshold_amount: Number(sx.threshold_amount),
-        initial_delay_days: Number(sx.initial_delay_days),
-        snooze_days: Number(sx.snooze_days),
+        threshold_amount: safeNum(sx.threshold_amount) || 50000,
+        initial_delay_days: safeNum(sx.initial_delay_days) || 2,
+        snooze_days: safeNum(sx.snooze_days) || 3,
       });
-      setInvoices(((l as any).invoices ?? []) as Invoice[]);
-      setReminders(((l as any).reminders ?? []) as Reminder[]);
-    } catch (e: any) {
-      toast.error(e?.message ?? "تعذر تحميل البيانات");
+      const rawInvoices = ((l as { invoices?: unknown[] })?.invoices ?? []) as Invoice[];
+      // Drop entries missing an id, normalise amount to a safe number, log skips.
+      const cleanInvoices: Invoice[] = [];
+      for (const inv of rawInvoices) {
+        try {
+          if (!inv || !inv.id) {
+            console.warn("[followup] skipping invoice without id", inv);
+            continue;
+          }
+          cleanInvoices.push({
+            ...inv,
+            amount: inv.amount == null ? 0 : safeNum(inv.amount),
+          });
+        } catch (err) {
+          console.error("[followup] failed to normalise invoice", inv, err);
+        }
+      }
+      setInvoices(cleanInvoices);
+      setReminders(((l as { reminders?: unknown[] })?.reminders ?? []) as Reminder[]);
+    } catch (e) {
+      console.error("[followup] reload failed", e);
+      toast.error((e as Error)?.message ?? "تعذر تحميل البيانات");
     } finally {
       setLoading(false);
     }
@@ -96,6 +142,7 @@ function AccountsFollowupPage() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   return (
     <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
@@ -188,87 +235,88 @@ function AccountsFollowupPage() {
               <h2 className="text-base font-bold">تذكيرات بانتظار الرد</h2>
               <div className="space-y-3">
                 {pending.map((r) => {
-                  const inv = invoices.find((i) => i.id === r.invoice_id);
-                  const sentAt = inv?.sent_at ? new Date(inv.sent_at) : null;
-                  const daysElapsed = sentAt
-                    ? Math.floor((Date.now() - sentAt.getTime()) / 86400000)
-                    : null;
-                  const phoneDigits = (inv?.customer_phone ?? "").replace(/[^\d]/g, "");
-                  const waMsg = inv
-                    ? `مرحباً ${inv.customer_name}، نود الاستفسار بخصوص الفاتورة رقم ${inv.invoice_number}.`
-                    : "";
-                  const waLink = phoneDigits
-                    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMsg)}`
-                    : null;
-                  return (
-                    <div key={r.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="text-sm font-semibold">
-                        {inv
-                          ? `هل دفع العميل ${inv.customer_name}؟`
-                          : r.message}
-                      </div>
-                      {inv && (
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          <div>👤 {inv.customer_name}</div>
-                          <div dir="ltr">📞 {inv.customer_phone || "—"}</div>
-                          <div>🧾 رقم الفاتورة: {inv.invoice_number}</div>
-                          <div>💵 المبلغ: {inv.amount != null ? inv.amount : "—"}</div>
-                          <div>
-                            📅 تاريخ الإرسال:{" "}
-                            {sentAt ? sentAt.toLocaleDateString("ar") : "—"}
-                          </div>
-                          {daysElapsed != null && (
-                            <div>⏱️ مرّ {daysElapsed} يوم على الإرسال</div>
-                          )}
+                  try {
+                    const inv = invoices.find((i) => i.id === r.invoice_id);
+                    const sentAt = safeDate(inv?.sent_at);
+                    const daysElapsed = sentAt
+                      ? Math.floor((Date.now() - sentAt.getTime()) / 86400000)
+                      : null;
+                    const phoneDigits = (inv?.customer_phone ?? "").replace(/[^\d]/g, "");
+                    const waMsg = inv
+                      ? `مرحباً ${inv.customer_name}، نود الاستفسار بخصوص الفاتورة رقم ${inv.invoice_number}.`
+                      : "";
+                    const waLink = phoneDigits
+                      ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMsg)}`
+                      : null;
+                    return (
+                      <div key={r.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="text-sm font-semibold">
+                          {inv ? `هل دفع العميل ${inv.customer_name}؟` : r.message}
                         </div>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            await respond({ data: { reminder_id: r.id, response: "paid" } });
-                            toast.success("تم تعليمها كمدفوعة");
-                            reload();
-                          }}
-                        >
-                          <CheckCircle2 className="h-4 w-4 ml-1" /> مدفوعة
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={async () => {
-                            await respond({ data: { reminder_id: r.id, response: "not_paid" } });
-                            toast.message("سيتم تذكيرك لاحقاً");
-                            reload();
-                          }}
-                        >
-                          <XCircle className="h-4 w-4 ml-1" /> غير مدفوعة
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            await respond({ data: { reminder_id: r.id, response: "snoozed" } });
-                            toast.message("ذكّرني لاحقاً");
-                            reload();
-                          }}
-                        >
-                          <Clock className="h-4 w-4 ml-1" /> ذكّرني لاحقاً
-                        </Button>
-                        {waLink && (
+                        {inv && (
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <div>👤 {inv.customer_name}</div>
+                            <div dir="ltr">📞 {inv.customer_phone || "—"}</div>
+                            <div>🧾 رقم الفاتورة: {inv.invoice_number}</div>
+                            <div>💵 المبلغ: {safeNum(inv.amount).toLocaleString("en-US")}</div>
+                            <div>📅 تاريخ الإرسال: {safeFormatDate(inv.sent_at)}</div>
+                            {daysElapsed != null && (
+                              <div>⏱️ مرّ {daysElapsed} يوم على الإرسال</div>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              await respond({ data: { reminder_id: r.id, response: "paid" } });
+                              toast.success("تم تعليمها كمدفوعة");
+                              reload();
+                            }}
+                          >
+                            <CheckCircle2 className="h-4 w-4 ml-1" /> مدفوعة
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={async () => {
+                              await respond({ data: { reminder_id: r.id, response: "not_paid" } });
+                              toast.message("سيتم تذكيرك لاحقاً");
+                              reload();
+                            }}
+                          >
+                            <XCircle className="h-4 w-4 ml-1" /> غير مدفوعة
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+                            onClick={async () => {
+                              await respond({ data: { reminder_id: r.id, response: "snoozed" } });
+                              toast.message("ذكّرني لاحقاً");
+                              reload();
+                            }}
                           >
-                            <Send className="h-4 w-4 ml-1" /> واتساب
+                            <Clock className="h-4 w-4 ml-1" /> ذكّرني لاحقاً
                           </Button>
-                        )}
+                          {waLink && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+                            >
+                              <Send className="h-4 w-4 ml-1" /> واتساب
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
+                    );
+                  } catch (err) {
+                    console.error("[followup] failed to render pending reminder", r, err);
+                    return null;
+                  }
                 })}
               </div>
+
             </Card>
           );
         })()}
@@ -285,93 +333,107 @@ function AccountsFollowupPage() {
           ) : (
             <div className="space-y-3">
               {invoices.map((inv) => {
-                const history = remindersByInvoice[inv.id] ?? [];
-                return (
-                  <div key={inv.id} className="rounded-lg border p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="font-semibold">{inv.customer_name}</div>
-                        <div className="text-xs text-muted-foreground" dir="ltr">
-                          {inv.customer_phone}
+                try {
+                  const history = remindersByInvoice[inv.id] ?? [];
+                  const currentAmount = safeNum(inv.amount);
+                  return (
+                    <div key={inv.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-semibold">{inv.customer_name || "—"}</div>
+                          <div className="text-xs text-muted-foreground" dir="ltr">
+                            {inv.customer_phone || "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            فاتورة {inv.invoice_number || "—"} · {safeFormatDate(inv.created_at)}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          فاتورة {inv.invoice_number} · {new Date(inv.created_at).toLocaleDateString("ar")}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                            inv.payment_status === "paid"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                          }`}
+                        >
+                          {inv.payment_status === "paid" ? "مدفوعة" : "غير مدفوعة"}
+                        </span>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">المبلغ</Label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount))}
+                            onChange={(e) =>
+                              setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
+                            }
+                          />
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            const raw = amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount));
+                            const num = raw === "" ? null : Number(raw);
+                            if (num !== null && (!Number.isFinite(num) || num < 0)) {
+                              toast.error("مبلغ غير صالح");
+                              return;
+                            }
+                            await saveAmount({ data: { invoice_id: inv.id, amount: num } });
+                            toast.success("تم حفظ المبلغ");
+                            reload();
+                          }}
+                        >
+                          حفظ
+                        </Button>
                       </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                          inv.payment_status === "paid"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                        }`}
-                      >
-                        {inv.payment_status === "paid" ? "مدفوعة" : "غير مدفوعة"}
-                      </span>
+                      {history.length > 0 && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-muted-foreground">
+                            سجل التذكيرات ({history.length})
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {history.map((h) => {
+                              try {
+                                return (
+                                  <li key={h.id} className="rounded border bg-muted/30 p-2">
+                                    <div className="font-mono text-[10px] text-muted-foreground">
+                                      {safeFormatDateTime(h.created_at)}
+                                    </div>
+                                    <div>
+                                      الحالة:{" "}
+                                      {h.status === "paid"
+                                        ? "مدفوعة"
+                                        : h.status === "not_paid"
+                                          ? "غير مدفوعة"
+                                          : h.status === "snoozed"
+                                            ? "ذكّرني لاحقاً"
+                                            : "بانتظار الرد"}
+                                    </div>
+                                    {h.next_remind_at && (
+                                      <div className="text-muted-foreground">
+                                        التذكير التالي: {safeFormatDateTime(h.next_remind_at)}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              } catch (err) {
+                                console.error("[followup] failed to render reminder history row", h, err);
+                                return null;
+                              }
+                            })}
+                          </ul>
+                        </details>
+                      )}
                     </div>
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">المبلغ</Label>
-                        <Input
-                          type="number"
-                          inputMode="decimal"
-                          value={amountDraft[inv.id] ?? (inv.amount?.toString() ?? "")}
-                          onChange={(e) =>
-                            setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          const raw = amountDraft[inv.id] ?? (inv.amount?.toString() ?? "");
-                          const num = raw === "" ? null : Number(raw);
-                          if (num !== null && (!Number.isFinite(num) || num < 0)) {
-                            toast.error("مبلغ غير صالح");
-                            return;
-                          }
-                          await saveAmount({ data: { invoice_id: inv.id, amount: num } });
-                          toast.success("تم حفظ المبلغ");
-                          reload();
-                        }}
-                      >
-                        حفظ
-                      </Button>
-                    </div>
-                    {history.length > 0 && (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-muted-foreground">
-                          سجل التذكيرات ({history.length})
-                        </summary>
-                        <ul className="mt-2 space-y-1">
-                          {history.map((h) => (
-                            <li key={h.id} className="rounded border bg-muted/30 p-2">
-                              <div className="font-mono text-[10px] text-muted-foreground">
-                                {new Date(h.created_at).toLocaleString("ar")}
-                              </div>
-                              <div>
-                                الحالة:{" "}
-                                {h.status === "paid"
-                                  ? "مدفوعة"
-                                  : h.status === "not_paid"
-                                    ? "غير مدفوعة"
-                                    : h.status === "snoozed"
-                                      ? "ذكّرني لاحقاً"
-                                      : "بانتظار الرد"}
-                              </div>
-                              {h.next_remind_at && (
-                                <div className="text-muted-foreground">
-                                  التذكير التالي: {new Date(h.next_remind_at).toLocaleString("ar")}
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
-                  </div>
-                );
+                  );
+                } catch (err) {
+                  console.error("[followup] failed to render invoice row", inv, err);
+                  return null;
+                }
               })}
+
             </div>
           )}
         </Card>
