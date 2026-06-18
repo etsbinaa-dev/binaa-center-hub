@@ -279,27 +279,22 @@ function AccountsFollowupPage() {
         initial_delay_days: safeNum(sx.initial_delay_days) || 2,
         snooze_days: safeNum(sx.snooze_days) || 3,
       });
-      const rawInvoices = ((l as { invoices?: unknown[] })?.invoices ?? []) as Invoice[];
-      // Drop entries missing an id, normalise amount to a safe number, log skips.
-      const cleanInvoices: Invoice[] = [];
-      for (const inv of rawInvoices) {
-        try {
-          if (!inv || !inv.id) {
-            console.warn("[followup] skipping invoice without id", inv);
-            continue;
-          }
-          cleanInvoices.push({
-            ...inv,
-            amount: inv.amount == null ? 0 : safeNum(inv.amount),
-          });
-        } catch (err) {
-          console.error("[followup] failed to normalise invoice", inv, err);
-        }
-      }
+      const listPayload = (l as { invoices?: unknown[]; reminders?: unknown[] }) ?? {};
+      const rawInvoices = Array.isArray(listPayload.invoices) ? listPayload.invoices : EMPTY_LIST;
+      const cleanInvoices = rawInvoices
+        .map((inv) => normaliseInvoice(inv))
+        .filter((inv): inv is Invoice => Boolean(inv));
       setInvoices(cleanInvoices);
-      setReminders(((l as { reminders?: unknown[] })?.reminders ?? []) as Reminder[]);
+      const rawReminders = Array.isArray(listPayload.reminders) ? listPayload.reminders : EMPTY_LIST;
+      setReminders(
+        rawReminders
+          .map((reminder) => normaliseReminder(reminder))
+          .filter((reminder): reminder is Reminder => Boolean(reminder)),
+      );
     } catch (e) {
-      console.error("[followup] reload failed", e);
+      logFollowupError("reload", e);
+      setInvoices([]);
+      setReminders([]);
       toast.error((e as Error)?.message ?? "تعذر تحميل البيانات");
     } finally {
       setLoading(false);
