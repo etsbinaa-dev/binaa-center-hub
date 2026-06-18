@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as InventoryRouteImport } from './routes/inventory'
@@ -39,6 +40,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PermissionsRoute = PermissionsRouteImport.update({
+  id: '/permissions',
+  path: '/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/permissions': typeof PermissionsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/invoices'
     | '/orders'
+    | '/permissions'
     | '/reports'
     | '/settings'
     | '/users'
@@ -230,6 +242,7 @@ export interface RootRouteChildren {
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
+  PermissionsRoute: typeof PermissionsRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/permissions': {
+      id: '/permissions'
+      path: '/permissions'
+      fullPath: '/permissions'
+      preLoaderRoute: typeof PermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -398,6 +418,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
+  PermissionsRoute: PermissionsRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,

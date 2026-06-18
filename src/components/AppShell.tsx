@@ -27,6 +27,7 @@ import {
   type ModuleKey,
   type Role,
 } from "@/lib/roles";
+import { usePermissions, hasPermission } from "@/hooks/use-permissions";
 
 type NavItem = {
   key: ModuleKey;
@@ -83,8 +84,14 @@ export function AppShell({
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
-  const allowed = canAccess(role, moduleKey);
-  const items = NAV.filter((n) => canAccess(role, n.key));
+  const { matrix, loaded: permsLoaded } = usePermissions();
+
+  // View access: prefer DB-stored permissions; fall back to static defaults until they load.
+  const canView = (m: ModuleKey) =>
+    permsLoaded ? hasPermission(matrix, role, m, "view") : canAccess(role, m);
+
+  const allowed = canView(moduleKey);
+  const items = NAV.filter((n) => canView(n.key));
 
 
   return (
