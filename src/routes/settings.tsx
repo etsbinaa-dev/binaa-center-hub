@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Check,
   Users,
+  Shield,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -237,15 +238,24 @@ function SettingsPage() {
       {/* Users management entry */}
       <Section icon={<Users className="h-5 w-5" />} title="إدارة المستخدمين">
         <p className="text-sm text-muted-foreground">
-          إنشاء حسابات الفريق، تعيين الأدوار، وإعادة تعيين كلمات المرور.
+          إنشاء حسابات الفريق، تعيين الأدوار، وإدارة الصلاحيات.
         </p>
-        <a
-          href="/users"
-          className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
-        >
-          <Users className="h-4 w-4" />
-          فتح صفحة المستخدمين
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href="/users"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+          >
+            <Users className="h-4 w-4" />
+            فتح صفحة المستخدمين
+          </a>
+          <a
+            href="/permissions"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-bold hover:bg-muted"
+          >
+            <Shield className="h-4 w-4" />
+            الصلاحيات
+          </a>
+        </div>
       </Section>
 
       {/* Organization */}
