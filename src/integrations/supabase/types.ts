@@ -198,12 +198,18 @@ export type Database = {
           created_by: string | null
           customer_id: string
           delivered_at: string | null
+          delivery_invoice_number: string | null
+          delivery_invoice_path: string | null
+          delivery_notes: string | null
+          delivery_started_at: string | null
           delivery_status: Database["public"]["Enums"]["delivery_status"]
           details: string | null
+          driver_name: string | null
           files: string[] | null
           id: string
           images: string[]
           invoiced_at: string | null
+          pointeur_name: string | null
           status: Database["public"]["Enums"]["order_status"]
           voice_note: string | null
         }
@@ -212,12 +218,18 @@ export type Database = {
           created_by?: string | null
           customer_id: string
           delivered_at?: string | null
+          delivery_invoice_number?: string | null
+          delivery_invoice_path?: string | null
+          delivery_notes?: string | null
+          delivery_started_at?: string | null
           delivery_status?: Database["public"]["Enums"]["delivery_status"]
           details?: string | null
+          driver_name?: string | null
           files?: string[] | null
           id?: string
           images?: string[]
           invoiced_at?: string | null
+          pointeur_name?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           voice_note?: string | null
         }
@@ -226,12 +238,18 @@ export type Database = {
           created_by?: string | null
           customer_id?: string
           delivered_at?: string | null
+          delivery_invoice_number?: string | null
+          delivery_invoice_path?: string | null
+          delivery_notes?: string | null
+          delivery_started_at?: string | null
           delivery_status?: Database["public"]["Enums"]["delivery_status"]
           details?: string | null
+          driver_name?: string | null
           files?: string[] | null
           id?: string
           images?: string[]
           invoiced_at?: string | null
+          pointeur_name?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           voice_note?: string | null
         }
