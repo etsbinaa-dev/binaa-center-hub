@@ -397,6 +397,13 @@ function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order 
     && typeof (navigator as any).contacts?.select === "function";
 
   async function pickFromContacts() {
+    if (!contactPickerSupported) {
+      setContactsUnavailable(true);
+      toast.message("اختيار جهات الاتصال متاح فقط من تطبيق الهاتف", {
+        description: "افتح التطبيق على هاتفك (Android/Chrome) لاستيراد جهة اتصال.",
+      });
+      return;
+    }
     try {
       const contacts = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
       if (!contacts || contacts.length === 0) return;
