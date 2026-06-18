@@ -318,7 +318,11 @@ export async function runFollowupScan(supabaseAdmin: any) {
     ]
       .filter(Boolean)
       .join("\n");
-    const tg = await sendTelegram(tgText);
+    const enabled2 = await isKindEnabled(supabaseAdmin, "debt_reminder");
+    const tg = enabled2
+      ? await sendTelegram(tgText)
+      : { ok: false, sent: 0, errors: ["disabled"] };
+    if (!enabled2) console.info("[followup] telegram skipped (disabled): debt_reminder");
     if (tg.ok && ins?.id) {
       await supabaseAdmin
         .from("account_reminders")
