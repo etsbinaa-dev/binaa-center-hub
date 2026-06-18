@@ -233,6 +233,20 @@ function SettingsPage() {
         </div>
       </div>
 
+      {/* Users management entry */}
+      <Section icon={<Users className="h-5 w-5" />} title="إدارة المستخدمين">
+        <p className="text-sm text-muted-foreground">
+          إنشاء حسابات الفريق، تعيين الأدوار، وإعادة تعيين كلمات المرور.
+        </p>
+        <a
+          href="/users"
+          className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+        >
+          <Users className="h-4 w-4" />
+          فتح صفحة المستخدمين
+        </a>
+      </Section>
+
       {/* Organization */}
       <Section icon={<Building2 className="h-5 w-5" />} title="معلومات المؤسسة">
         <form onSubmit={saveOrg} className="space-y-3">
