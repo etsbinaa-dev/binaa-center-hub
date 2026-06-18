@@ -56,7 +56,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   const refresh = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("role_permissions")
       .select("role, module, permission, allowed");
     if (error || !data) {
