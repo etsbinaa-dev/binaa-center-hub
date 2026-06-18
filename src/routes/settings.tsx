@@ -416,6 +416,45 @@ function SettingsPage() {
         </form>
       </Section>
 
+      {/* Notifications */}
+      <Section icon={<Bell className="h-5 w-5" />} title="إعدادات الإشعارات">
+        {!notifLoaded ? (
+          <p className="text-sm text-muted-foreground">جاري التحميل…</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="mb-2 text-xs text-muted-foreground">
+              يتم حفظ هذه الإعدادات في قاعدة البيانات وتطبيقها مباشرة على إشعارات تيليجرام.
+            </p>
+            {NOTIFICATION_KINDS.map((n) => {
+              const on = notifFlags[n.kind] ?? true;
+              return (
+                <label
+                  key={n.kind}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5"
+                >
+                  <span className="text-sm font-medium">{n.label}</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    onClick={() => toggleNotif(n.kind)}
+                    className={`relative h-6 w-11 rounded-full transition ${
+                      on ? "bg-primary" : "bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                        on ? "start-0.5" : "end-0.5"
+                      }`}
+                    />
+                  </button>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
       {/* Backup */}
       <Section icon={<Database className="h-5 w-5" />} title="النسخ الاحتياطي">
         <p className="mb-3 text-xs text-muted-foreground">
