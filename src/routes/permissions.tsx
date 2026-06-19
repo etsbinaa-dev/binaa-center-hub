@@ -33,7 +33,7 @@ const ROLE_LABELS: Record<Role, string> = {
 const MODULE_LABELS: Record<ModuleKey, string> = {
   home: "لوحة التحكم",
   orders: "الطلبات",
-  invoices: "الفواتير",
+  invoices: "فرز وإرسال",
   delivery: "التوصيل",
   inventory: "الكميات",
   customers: "العملاء",
