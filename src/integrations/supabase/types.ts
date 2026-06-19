@@ -441,6 +441,7 @@ export type Database = {
           category: string
           label: string
           min_quantity: number
+          previous_quantity: number
           product_key: string
           quantity: number
           updated_at: string
@@ -450,6 +451,7 @@ export type Database = {
           category: string
           label: string
           min_quantity?: number
+          previous_quantity?: number
           product_key: string
           quantity?: number
           updated_at?: string
@@ -459,6 +461,7 @@ export type Database = {
           category?: string
           label?: string
           min_quantity?: number
+          previous_quantity?: number
           product_key?: string
           quantity?: number
           updated_at?: string
