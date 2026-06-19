@@ -6,7 +6,7 @@ import { InvoicesList } from "@/components/invoices-list";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/invoices")({
-  head: () => ({ meta: [{ title: "الفواتير — بِناء HUB" }] }),
+  head: () => ({ meta: [{ title: "فرز وإرسال — بِناء HUB" }] }),
   component: InvoicesPage,
 });
 
