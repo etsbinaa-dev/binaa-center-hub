@@ -57,13 +57,14 @@ function normalizePhone(p: string) {
   return (p || "").replace(/[^\d+]/g, "");
 }
 
-function fmtDateTime(s: string | null) {
+function fmtDateTime(s: string | null, latn = false) {
   if (!s) return "—";
-  return new Date(s).toLocaleString("ar-EG", {
+  return new Date(s).toLocaleString(latn ? "ar-EG-u-nu-latn" : "ar-EG", {
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
