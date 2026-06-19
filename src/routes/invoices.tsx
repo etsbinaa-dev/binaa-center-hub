@@ -15,7 +15,7 @@ function InvoicesPage() {
   const isSent = pathname.startsWith("/invoices/sent");
 
   return (
-    <AppShell moduleKey="invoices" title="الفواتير">
+    <AppShell moduleKey="invoices" title="فرز وإرسال">
       <RequireAuth>
         <div className="space-y-5">
           <Tabs isSent={isSent} />
