@@ -65,12 +65,11 @@ function loadSettings(): AppSettings {
 
 const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
   { kind: "order_new", label: "إشعار طلب جديد" },
-  { kind: "invoice_new", label: "إشعار تمت الفوترة" },
   { kind: "delivery_start", label: "إشعار بدأ التوصيل" },
   { kind: "delivery_done", label: "إشعار تم التسليم" },
   { kind: "large_account", label: "إشعار الحسابات الكبيرة" },
   { kind: "debt_reminder", label: "إشعار التذكير بالديون" },
-  { kind: "invoice_sent", label: "إشعار إرسال الفواتير عبر واتساب" },
+  { kind: "invoice_module", label: "إشعار فرز وإرسال الفواتير" },
   { kind: "daily_payment", label: "إشعار التحصيل اليومي" },
 ];
 
