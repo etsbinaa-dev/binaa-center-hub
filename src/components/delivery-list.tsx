@@ -86,9 +86,18 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
         .eq("status", "archived");
       if (view === "archive") q = q.eq("delivery_status", "delivered");
       else q = q.in("delivery_status", ["new", "in_progress"]);
-      const { data, error } = await q.order("created_at", { ascending: false });
+      const { data, error } = await q;
       if (error) throw error;
       const list = (data as unknown as DeliveryOrder[]) ?? [];
+      list.sort((a, b) => {
+        const aTime = view === "archive"
+          ? (a.delivered_at || a.created_at)
+          : (a.delivery_started_at || a.created_at);
+        const bTime = view === "archive"
+          ? (b.delivered_at || b.created_at)
+          : (b.delivery_started_at || b.created_at);
+        return new Date(bTime).getTime() - new Date(aTime).getTime();
+      });
       if (!search.trim()) return list;
       const s = search.toLowerCase();
       return list.filter(
