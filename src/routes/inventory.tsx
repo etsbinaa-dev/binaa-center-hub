@@ -78,6 +78,8 @@ function QuantitiesPage() {
   }, []);
 
   const [values, setValues] = useState<Record<string, number>>(initial);
+  const [previous, setPrevious] = useState<Record<string, number>>(initial);
+  const [updatedAt, setUpdatedAt] = useState<Record<string, string | null>>({});
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(SECTIONS.map((s) => [s.category, true])),
   );
@@ -87,19 +89,27 @@ function QuantitiesPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("quantities").select("product_key, quantity");
+      const { data, error } = await supabase
+        .from("quantities")
+        .select("product_key, quantity, previous_quantity, updated_at");
       if (!error && data) {
         const low: Record<string, boolean> = {};
+        const prevMap: Record<string, number> = {};
+        const updMap: Record<string, string | null> = {};
         setValues((prev) => {
           const next = { ...prev };
-          for (const r of data) {
+          for (const r of data as Array<{ product_key: string; quantity: number | null; previous_quantity: number | null; updated_at: string | null }>) {
             if (r.product_key in next) {
               next[r.product_key] = r.quantity ?? 0;
+              prevMap[r.product_key] = r.previous_quantity ?? 0;
+              updMap[r.product_key] = r.updated_at;
               low[r.product_key] = (r.quantity ?? 0) <= LOW_STOCK_THRESHOLD;
             }
           }
           return next;
         });
+        setPrevious((p) => ({ ...p, ...prevMap }));
+        setUpdatedAt(updMap);
         setSavedLow(low);
       }
       setLoading(false);
@@ -113,12 +123,21 @@ function QuantitiesPage() {
 
   const save = async () => {
     setSaving(true);
+    // snapshot: read current saved quantities to use as previous_quantity
+    const { data: current } = await supabase
+      .from("quantities")
+      .select("product_key, quantity");
+    const prevSnapshot: Record<string, number> = {};
+    for (const r of (current ?? []) as Array<{ product_key: string; quantity: number | null }>) {
+      prevSnapshot[r.product_key] = r.quantity ?? 0;
+    }
     const rows = SECTIONS.flatMap((s) =>
       s.items.map((p) => ({
         product_key: p.key,
         label: p.label,
         category: s.category,
         quantity: values[p.key],
+        previous_quantity: prevSnapshot[p.key] ?? 0,
         min_quantity: 50,
       })),
     );
@@ -128,6 +147,13 @@ function QuantitiesPage() {
     else {
       toast.success("تم حفظ الكميات بنجاح");
       logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
+      setPrevious(prevSnapshot);
+      const nowIso = new Date().toISOString();
+      setUpdatedAt((u) => {
+        const next = { ...u };
+        for (const s of SECTIONS) for (const p of s.items) next[p.key] = nowIso;
+        return next;
+      });
       const newlyLow: { key: string; label: string }[] = [];
       const nextLow: Record<string, boolean> = {};
       for (const s of SECTIONS) {
@@ -142,6 +168,14 @@ function QuantitiesPage() {
         notify("low_stock", `تحذير: ${p.label} وصل إلى المخزون الحرج.`);
       }
     }
+  };
+
+  const fmtUpdated = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "long" });
+    const time = d.toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${date} ${time}`;
   };
 
   return (
@@ -222,6 +256,37 @@ function QuantitiesPage() {
                             onChange={(e) => update(p.key, e.target.value)}
                             className="text-center text-base font-semibold"
                           />
+                          {(() => {
+                            const prev = previous[p.key] ?? 0;
+                            const diff = qty - prev;
+                            const diffTone =
+                              diff > 0
+                                ? "text-green-600 dark:text-green-400"
+                                : diff < 0
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-muted-foreground";
+                            const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "—";
+                            const upd = fmtUpdated(updatedAt[p.key]);
+                            return (
+                              <div className="mt-1.5 space-y-0.5 text-[11px] leading-tight text-muted-foreground">
+                                <div className="flex items-center justify-between">
+                                  <span>أمس:</span>
+                                  <span className="font-medium tabular-nums">{prev}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>الفرق:</span>
+                                  <span className={`font-semibold tabular-nums ${diffTone}`}>
+                                    {arrow} {Math.abs(diff)}
+                                  </span>
+                                </div>
+                                {upd && (
+                                  <div className="pt-0.5 text-[10px] opacity-80">
+                                    آخر تحديث: {upd}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
