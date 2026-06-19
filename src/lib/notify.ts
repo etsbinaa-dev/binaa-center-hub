@@ -21,10 +21,12 @@ const TELEGRAM_MAP: Partial<Record<NotificationType, TelegramAlertKind>> = {
 };
 
 // Maps Telegram alert kind -> notification_settings.kind row
+// Invoice OCR/WhatsApp module is gated by ONE independent master key
+// (`invoice_module`) and never shares keys with orders/delivery.
 const SETTINGS_KIND_MAP: Partial<Record<TelegramAlertKind, string>> = {
   order_new: "order_new",
-  invoice_new: "invoice_new",
-  invoice_sent: "invoice_sent",
+  invoice_new: "invoice_module",
+  invoice_sent: "invoice_module",
   delivery_start: "delivery_start",
   delivery_done: "delivery_done",
 };

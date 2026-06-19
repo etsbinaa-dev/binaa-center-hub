@@ -39,7 +39,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { key: "home", label: "الرئيسية", to: "/", icon: Home },
   { key: "orders", label: "الطلبات", to: "/orders", icon: ClipboardList },
-  { key: "invoices", label: "الفواتير", to: "/invoices", icon: Receipt },
+  { key: "invoices", label: "فرز وإرسال", to: "/invoices", icon: Receipt },
   { key: "delivery", label: "التوصيل", to: "/delivery", icon: Truck },
   { key: "inventory", label: "الكميات", to: "/inventory", icon: Package },
   { key: "customers", label: "العملاء", to: "/customers", icon: User },
