@@ -189,11 +189,11 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       <span className="text-muted-foreground">رقم الفاتورة:</span>
                       <span className="font-medium">{o.delivery_invoice_number ?? "—"}</span>
                       <span className="text-muted-foreground">بدء التوصيل:</span>
-                      <span className="font-medium">{fmtDateTime(o.delivery_started_at)}</span>
+                      <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivery_started_at, view === "archive")}</span>
                       {o.delivery_status === "delivered" && (
                         <>
                           <span className="text-muted-foreground">تم التسليم:</span>
-                          <span className="font-medium">{fmtDateTime(o.delivered_at)}</span>
+                          <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivered_at, view === "archive")}</span>
                         </>
                       )}
                     </div>
