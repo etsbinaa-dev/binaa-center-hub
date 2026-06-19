@@ -1,0 +1,1 @@
+ALTER TABLE public.quantities ADD COLUMN IF NOT EXISTS previous_quantity integer NOT NULL DEFAULT 0;
