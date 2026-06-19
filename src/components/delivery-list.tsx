@@ -162,7 +162,15 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                     <DeliveryBadge status={o.delivery_status} />
                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                      {view === "archive" && o.delivered_at ? (
+                        <span dir="ltr">
+                          {new Date(o.delivered_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
+                          {" • "}
+                          {new Date(o.delivered_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                        </span>
+                      ) : (
+                        new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })
+                      )}
                     </div>
                   </div>
                 </div>
