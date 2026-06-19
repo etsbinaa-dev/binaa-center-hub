@@ -57,13 +57,14 @@ function normalizePhone(p: string) {
   return (p || "").replace(/[^\d+]/g, "");
 }
 
-function fmtDateTime(s: string | null) {
+function fmtDateTime(s: string | null, latn = false) {
   if (!s) return "—";
-  return new Date(s).toLocaleString("ar-EG", {
+  return new Date(s).toLocaleString(latn ? "ar-EG-u-nu-latn" : "ar-EG", {
     day: "numeric",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
@@ -161,7 +162,15 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                     <DeliveryBadge status={o.delivery_status} />
                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                      {view === "archive" && o.delivered_at ? (
+                        <span dir="ltr">
+                          {new Date(o.delivered_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
+                          {" • "}
+                          {new Date(o.delivered_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                        </span>
+                      ) : (
+                        new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })
+                      )}
                     </div>
                   </div>
                 </div>
@@ -180,11 +189,11 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       <span className="text-muted-foreground">رقم الفاتورة:</span>
                       <span className="font-medium">{o.delivery_invoice_number ?? "—"}</span>
                       <span className="text-muted-foreground">بدء التوصيل:</span>
-                      <span className="font-medium">{fmtDateTime(o.delivery_started_at)}</span>
+                      <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivery_started_at, view === "archive")}</span>
                       {o.delivery_status === "delivered" && (
                         <>
                           <span className="text-muted-foreground">تم التسليم:</span>
-                          <span className="font-medium">{fmtDateTime(o.delivered_at)}</span>
+                          <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivered_at, view === "archive")}</span>
                         </>
                       )}
                     </div>

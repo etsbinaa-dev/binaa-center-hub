@@ -203,7 +203,15 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
                   <StatusBadge status={o.status} />
                   <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    {new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                    {status === "archived" && o.invoiced_at ? (
+                      <span dir="ltr">
+                        {new Date(o.invoiced_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
+                        {" • "}
+                        {new Date(o.invoiced_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                      </span>
+                    ) : (
+                      new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })
+                    )}
                   </div>
                 </div>
               </div>
