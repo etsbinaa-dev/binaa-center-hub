@@ -163,9 +163,9 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {view === "archive" && o.delivered_at ? (
-                        <span dir="ltr">
+                        <span>
                           {new Date(o.delivered_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
-                          {" • "}
+                          {" "}
                           {new Date(o.delivered_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
                         </span>
                       ) : (
