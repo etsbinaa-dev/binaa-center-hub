@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Wallet, Plus, Image as ImageIcon, X, Trash2, RefreshCw } from "lucide-react";
+import { Wallet, Plus, Image as ImageIcon, X, Trash2, RefreshCw, Check, Archive } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/daily-payments")({
   ),
 });
 
-type FilterKind = "today" | "week" | "all";
+type ViewKind = "active" | "archive";
 
 type Row = {
   id: string;
@@ -31,6 +31,9 @@ type Row = {
   notes: string | null;
   created_by_name: string | null;
   created_at: string;
+  status?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by_name?: string | null;
 };
 
 const METHODS: { value: DailyPaymentMethod; label: string }[] = [
@@ -45,16 +48,6 @@ const METHOD_LABEL: Record<DailyPaymentMethod, string> = Object.fromEntries(
   METHODS.map((m) => [m.value, m.label]),
 ) as Record<DailyPaymentMethod, string>;
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function startOfWeek(): Date {
-  const d = startOfToday();
-  d.setDate(d.getDate() - 6);
-  return d;
-}
 
 function formatAmount(n: number) {
   try { return new Intl.NumberFormat("fr-FR").format(n); } catch { return String(n); }
@@ -71,7 +64,7 @@ function DailyPaymentsPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterKind>("today");
+  const [view, setView] = useState<ViewKind>("active");
   const [openForm, setOpenForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const notify = useServerFn(notifyDailyPayment);
@@ -103,10 +96,33 @@ function DailyPaymentsPage() {
   }, [toast]);
 
   const filtered = useMemo(() => {
-    if (filter === "all") return rows;
-    const cutoff = filter === "today" ? startOfToday() : startOfWeek();
-    return rows.filter((r) => new Date(r.created_at) >= cutoff);
-  }, [rows, filter]);
+    return rows.filter((r) =>
+      view === "archive" ? r.status === "done" : r.status !== "done",
+    );
+  }, [rows, view]);
+
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    "مستخدم";
+
+  const markDone = async (id: string) => {
+    const patch = {
+      status: "done",
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user?.id ?? null,
+      reviewed_by_name: userName,
+    };
+    const { error } = await (supabase as any)
+      .from("daily_payments")
+      .update(patch)
+      .eq("id", id);
+    if (error) setToast("تعذر التحديث: " + error.message);
+    else {
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+      setToast("تم نقلها إلى الأرشيف");
+    }
+  };
 
   const remove = async (id: string) => {
     if (!confirm("حذف هذه العملية؟")) return;
@@ -117,11 +133,6 @@ function DailyPaymentsPage() {
       setToast("تم الحذف");
     }
   };
-
-  const userName =
-    (user?.user_metadata?.full_name as string | undefined) ||
-    user?.email ||
-    "مستخدم";
 
   return (
     <div className="space-y-4 pb-24">
@@ -145,18 +156,17 @@ function DailyPaymentsPage() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* View toggle */}
       <div className="flex flex-wrap gap-2">
         {([
-          { k: "today", label: "اليوم" },
-          { k: "week", label: "هذا الأسبوع" },
-          { k: "all", label: "الكل" },
+          { k: "active", label: "غير معالجة" },
+          { k: "archive", label: "الأرشيف" },
         ] as const).map((f) => (
           <button
             key={f.k}
-            onClick={() => setFilter(f.k)}
+            onClick={() => setView(f.k)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-              filter === f.k
+              view === f.k
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background hover:bg-muted"
             }`}
@@ -179,11 +189,13 @@ function DailyPaymentsPage() {
         <div className="py-10 text-center text-sm text-muted-foreground">جاري التحميل…</div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          لا توجد عمليات تحصيل ضمن هذا النطاق.
+          {view === "archive" ? "لا توجد عمليات في الأرشيف." : "لا توجد عمليات تحصيل غير معالجة."}
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((r) => (
+          {filtered.map((r) => {
+            const isDone = r.status === "done";
+            return (
             <li
               key={r.id}
               className="rounded-2xl border border-border bg-card p-3 shadow-sm"
@@ -194,6 +206,15 @@ function DailyPaymentsPage() {
                     <span className="text-base font-bold">{r.customer_name}</span>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
                       {METHOD_LABEL[r.payment_method] ?? r.payment_method}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        isDone
+                          ? "bg-emerald-500/10 text-emerald-600"
+                          : "bg-amber-500/10 text-amber-600"
+                      }`}
+                    >
+                      {isDone ? "تم" : "غير معالج"}
                     </span>
                     {r.invoice_number ? (
                       <span className="text-xs text-muted-foreground">
@@ -212,21 +233,40 @@ function DailyPaymentsPage() {
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>🕒 {formatDateTime(r.created_at)}</span>
                     {r.created_by_name ? <span>🧑‍💼 {r.created_by_name}</span> : null}
+                    {isDone && r.reviewed_at ? (
+                      <span>✅ {formatDateTime(r.reviewed_at)}{r.reviewed_by_name ? ` — ${r.reviewed_by_name}` : ""}</span>
+                    ) : null}
                   </div>
                   {r.image_path ? (
                     <AttachmentPreview path={r.image_path} />
                   ) : null}
                 </div>
-                <button
-                  onClick={() => remove(r.id)}
-                  className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
-                  aria-label="حذف"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex flex-col items-center gap-1">
+                  {!isDone ? (
+                    <button
+                      onClick={() => markDone(r.id)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20"
+                      aria-label="تم"
+                    >
+                      <Check className="h-4 w-4" /> تم
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+                      <Archive className="h-3.5 w-3.5" /> مؤرشفة
+                    </span>
+                  )}
+                  <button
+                    onClick={() => remove(r.id)}
+                    className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
+                    aria-label="حذف"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
