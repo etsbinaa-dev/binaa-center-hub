@@ -18,12 +18,25 @@ import { sendTelegramOrderNotification } from "@/lib/telegram.functions";
 import { OrderAttachmentInput, type LocalAttachments } from "@/components/order-attachment-input";
 import { OrderAttachmentsView } from "@/components/order-attachments-view";
 import { logActivity } from "@/lib/activity";
+import { isNotificationEnabled } from "@/lib/notify";
 
-function fireTelegram(
+// Gate by independent notification_settings keys per event:
+// - created  -> order_new
+// - invoiced -> order_invoiced (تمت الفوترة) — independent from OCR invoice_module
+// - updated  -> always sent (no gate)
+async function fireTelegram(
   notify: ReturnType<typeof useServerFn<typeof sendTelegramOrderNotification>>,
   kind: "created" | "invoiced" | "updated",
   o: { customers: { name: string; phone: string } | null; details: string | null },
 ) {
+  const gateKey = kind === "created" ? "order_new" : kind === "invoiced" ? "order_invoiced" : null;
+  if (gateKey) {
+    const enabled = await isNotificationEnabled(gateKey);
+    if (!enabled) {
+      console.info(`[telegram] order ${kind} skipped (disabled): ${gateKey}`);
+      return;
+    }
+  }
   notify({
     data: {
       kind,
