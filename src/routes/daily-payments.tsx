@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Wallet, Plus, Image as ImageIcon, X, Trash2, RefreshCw } from "lucide-react";
+import { Wallet, Plus, Image as ImageIcon, X, Trash2, RefreshCw, Check, Archive } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/daily-payments")({
   ),
 });
 
-type FilterKind = "today" | "week" | "all";
+type ViewKind = "active" | "archive";
 
 type Row = {
   id: string;
@@ -31,6 +31,9 @@ type Row = {
   notes: string | null;
   created_by_name: string | null;
   created_at: string;
+  status?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by_name?: string | null;
 };
 
 const METHODS: { value: DailyPaymentMethod; label: string }[] = [
@@ -45,16 +48,6 @@ const METHOD_LABEL: Record<DailyPaymentMethod, string> = Object.fromEntries(
   METHODS.map((m) => [m.value, m.label]),
 ) as Record<DailyPaymentMethod, string>;
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function startOfWeek(): Date {
-  const d = startOfToday();
-  d.setDate(d.getDate() - 6);
-  return d;
-}
 
 function formatAmount(n: number) {
   try { return new Intl.NumberFormat("fr-FR").format(n); } catch { return String(n); }
@@ -71,7 +64,7 @@ function DailyPaymentsPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterKind>("today");
+  const [view, setView] = useState<ViewKind>("active");
   const [openForm, setOpenForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const notify = useServerFn(notifyDailyPayment);
@@ -103,10 +96,33 @@ function DailyPaymentsPage() {
   }, [toast]);
 
   const filtered = useMemo(() => {
-    if (filter === "all") return rows;
-    const cutoff = filter === "today" ? startOfToday() : startOfWeek();
-    return rows.filter((r) => new Date(r.created_at) >= cutoff);
-  }, [rows, filter]);
+    return rows.filter((r) =>
+      view === "archive" ? r.status === "done" : r.status !== "done",
+    );
+  }, [rows, view]);
+
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    "مستخدم";
+
+  const markDone = async (id: string) => {
+    const patch = {
+      status: "done",
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user?.id ?? null,
+      reviewed_by_name: userName,
+    };
+    const { error } = await (supabase as any)
+      .from("daily_payments")
+      .update(patch)
+      .eq("id", id);
+    if (error) setToast("تعذر التحديث: " + error.message);
+    else {
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+      setToast("تم نقلها إلى الأرشيف");
+    }
+  };
 
   const remove = async (id: string) => {
     if (!confirm("حذف هذه العملية؟")) return;
@@ -117,11 +133,6 @@ function DailyPaymentsPage() {
       setToast("تم الحذف");
     }
   };
-
-  const userName =
-    (user?.user_metadata?.full_name as string | undefined) ||
-    user?.email ||
-    "مستخدم";
 
   return (
     <div className="space-y-4 pb-24">
@@ -145,18 +156,17 @@ function DailyPaymentsPage() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* View toggle */}
       <div className="flex flex-wrap gap-2">
         {([
-          { k: "today", label: "اليوم" },
-          { k: "week", label: "هذا الأسبوع" },
-          { k: "all", label: "الكل" },
+          { k: "active", label: "غير معالجة" },
+          { k: "archive", label: "الأرشيف" },
         ] as const).map((f) => (
           <button
             key={f.k}
-            onClick={() => setFilter(f.k)}
+            onClick={() => setView(f.k)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-              filter === f.k
+              view === f.k
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background hover:bg-muted"
             }`}
