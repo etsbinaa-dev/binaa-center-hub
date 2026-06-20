@@ -193,6 +193,10 @@ export type Database = {
           invoice_number: string | null
           notes: string | null
           payment_method: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+          status: string
           updated_at: string
         }
         Insert: {
@@ -206,6 +210,10 @@ export type Database = {
           invoice_number?: string | null
           notes?: string | null
           payment_method: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -219,6 +227,10 @@ export type Database = {
           invoice_number?: string | null
           notes?: string | null
           payment_method?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: []
