@@ -65,6 +65,7 @@ function loadSettings(): AppSettings {
 
 const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
   { kind: "order_new", label: "إشعار طلب جديد" },
+  { kind: "order_invoiced", label: "إشعار تمت الفوترة" },
   { kind: "delivery_start", label: "إشعار بدأ التوصيل" },
   { kind: "delivery_done", label: "إشعار تم التسليم" },
   { kind: "large_account", label: "إشعار الحسابات الكبيرة" },
