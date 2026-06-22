@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
 
-const DEFAULT_lowStockThreshold = 5;
+const DEFAULT_LOW_STOCK_THRESHOLD = 5;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
@@ -86,7 +86,7 @@ function QuantitiesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedLow, setSavedLow] = useState<Record<string, boolean>>({});
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_lowStockThreshold);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
 
   useEffect(() => {
     (async () => {
