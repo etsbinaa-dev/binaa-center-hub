@@ -15,6 +15,7 @@ import {
   LogIn,
   LogOut,
   Wallet,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -37,6 +38,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { key: "home", label: "الرئيسية", to: "/", icon: Home },
   { key: "orders", label: "الطلبات", to: "/orders", icon: ClipboardList },
+  { key: "reception", label: "الاستقبال", to: "/reception", icon: Inbox },
   { key: "invoices", label: "فرز وإرسال", to: "/invoices", icon: Receipt },
   { key: "delivery", label: "التوصيل", to: "/delivery", icon: Truck },
   { key: "inventory", label: "الكميات", to: "/inventory", icon: Package },
