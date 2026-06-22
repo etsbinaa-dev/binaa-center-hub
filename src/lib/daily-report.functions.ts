@@ -2,6 +2,29 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sendTelegram } from "@/lib/telegram-alert.functions";
 
+async function sendTelegramToAdmin(text: string): Promise<{ ok: boolean; sent: number; errors: string[] }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  if (!token || !chatId) {
+    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID");
+    return { ok: false, sent: 0, errors: ["missing_config"] };
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { ok: false, sent: 0, errors: [`${chatId}: ${res.status} ${body}`] };
+    }
+    return { ok: true, sent: 1, errors: [] };
+  } catch (e: any) {
+    return { ok: false, sent: 0, errors: [e?.message ?? String(e)] };
+  }
+}
+
 function fmtTime(): string {
   try {
     return new Intl.DateTimeFormat("ar", {
@@ -131,7 +154,8 @@ export async function runDailyReport(supabaseAdmin: any) {
     `🕒 ${fmtTime()}`,
   ].join("\n");
 
-  const tg = await sendTelegram(text);
+  void sendTelegram;
+  const tg = await sendTelegramToAdmin(text);
   return { ok: tg.ok, sent: tg.sent };
 }
 
