@@ -62,19 +62,24 @@ const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
 ];
 
 function SettingsPage() {
+  const { isAdmin } = useAuth();
+  const sendDailyReportNow = useServerFn(runDailyReportFn);
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notifFlags, setNotifFlags] = useState<Record<string, boolean>>({});
   const [notifLoaded, setNotifLoaded] = useState(false);
+  const [dailyReportTime, setDailyReportTime] = useState<string>("21:00");
+  const [sendingNow, setSendingNow] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
         .from("app_settings")
         .select(
-          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity",
+          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, daily_report_time",
         )
         .eq("id", 1)
         .maybeSingle();
