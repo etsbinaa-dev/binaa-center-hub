@@ -117,7 +117,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
     receptionsToday,
     quantities,
     houseOps,
-    tempPending,
+    tempPendingList,
     overdueAccountsList,
     threshold,
   ] = await Promise.all([
@@ -141,16 +141,14 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       .gte("created_at", iso),
     supabaseAdmin.from("quantities").select("label, quantity"),
     supabaseAdmin.from("house_cash_ops").select("op_type, amount"),
-    count(
-      supabaseAdmin
-        .from("temp_entries")
-        .select("id", { count: "exact", head: true })
-        .neq("status", "done"),
-    ),
+    supabaseAdmin
+      .from("temp_entries")
+      .select("kind, amount, description")
+      .neq("status", "done")
+      .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("account_reminders")
-      .select("amount, paid_amount, invoice:invoices(customer_name, amount, amount_manual, paid_amount)")
-      .neq("payment_status", "paid"),
+      .select("amount, paid_amount, status, invoice:invoices(customer_name, amount, amount_manual, paid_amount)"),
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
@@ -163,13 +161,24 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
   const lowOrCritical = (quantities.data ?? []).filter(
     (q: any) => (Number(q.quantity) || 0) <= Math.max(critQty, 50),
   );
+  // Sort: critical (🔴) first then low (🟠); within each group ascending by quantity
+  lowOrCritical.sort((a: any, b: any) => {
+    const qa = Number(a.quantity) || 0;
+    const qb = Number(b.quantity) || 0;
+    const ga = qa <= critQty ? 0 : 1;
+    const gb = qb <= critQty ? 0 : 1;
+    if (ga !== gb) return ga - gb;
+    return qa - qb;
+  });
 
   const fmtMoney = (n: number) =>
     n.toLocaleString("ar-DZ", { maximumFractionDigits: 2 }) + " MRO";
 
   const unsentInvoices = (unsentInvoicesList.data ?? []) as any[];
   const activeDeliveries = (activeDeliveriesList.data ?? []) as any[];
-  const overdueAccounts = (overdueAccountsList.data ?? []) as any[];
+  const overdueAccountsRaw = (overdueAccountsList.data ?? []) as any[];
+  const overdueAccounts = overdueAccountsRaw.filter((r: any) => r.status !== "paid");
+  const tempPendingRows = (tempPendingList.data ?? []) as any[];
 
   const deliveryLines =
     activeDeliveries.length === 0
@@ -204,6 +213,15 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
           (r) => `• ${r.supplier} — ${r.goods_type} (${r.quantity} ${r.unit})`,
         );
 
+  const tempLines =
+    tempPendingRows.length === 0
+      ? ["—"]
+      : tempPendingRows.map((t: any) => {
+          const kind = t.kind === "income" ? "دخل" : t.kind === "expense" ? "خرج" : (t.kind ?? "—");
+          const desc = (t.description ?? "").toString().trim() || "—";
+          return `• ${kind} — ${fmtMoney(Number(t.amount) || 0)} — ${desc}`;
+        });
+
   const lowLines =
     lowOrCritical.length === 0
       ? ["—"]
@@ -226,7 +244,8 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
     "",
     `💵 كيص الدار: ${fmtMoney(balance)}`,
     "",
-    `📝 قيود غير معالجة: ${tempPending}`,
+    `📝 قيود غير معالجة (${tempPendingRows.length}):`,
+    ...tempLines,
     "",
     `⏰ حسابات متأخرة (${overdueAccounts.length}):`,
     ...overdueLines,
