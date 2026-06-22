@@ -35,8 +35,6 @@ type AppSettings = {
   invoices: { whatsappMessage: string; showSmsMessage: boolean };
 };
 
-const STORAGE_KEY = "binaa.settings";
-
 const defaults: AppSettings = {
   org: { name: "", phone: "", address: "" },
   inventory: { criticalQuantity: 5 },
@@ -46,22 +44,6 @@ const defaults: AppSettings = {
     showSmsMessage: true,
   },
 };
-
-function loadSettings(): AppSettings {
-  if (typeof window === "undefined") return defaults;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    return {
-      org: { ...defaults.org, ...(parsed.org ?? {}) },
-      inventory: { ...defaults.inventory, ...(parsed.inventory ?? {}) },
-      invoices: { ...defaults.invoices, ...(parsed.invoices ?? {}) },
-    };
-  } catch {
-    return defaults;
-  }
-}
 
 const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
   { kind: "order_new", label: "إشعار طلب جديد" },
@@ -83,8 +65,40 @@ function SettingsPage() {
   const [notifLoaded, setNotifLoaded] = useState(false);
 
   useEffect(() => {
-    setSettings(loadSettings());
-    setLoaded(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select(
+          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity",
+        )
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) console.error("[settings:app_settings]", error);
+      if (data) {
+        const row = data as any;
+        setSettings({
+          org: {
+            name: row.org_name ?? "",
+            phone: row.org_phone ?? "",
+            address: row.org_address ?? "",
+          },
+          inventory: {
+            criticalQuantity:
+              typeof row.critical_quantity === "number"
+                ? row.critical_quantity
+                : defaults.inventory.criticalQuantity,
+          },
+          invoices: {
+            whatsappMessage: row.whatsapp_message ?? defaults.invoices.whatsappMessage,
+            showSmsMessage:
+              typeof row.show_sms_message === "boolean"
+                ? row.show_sms_message
+                : defaults.invoices.showSmsMessage,
+          },
+        });
+      }
+      setLoaded(true);
+    })();
     (async () => {
       const { data, error } = await supabase
         .from("notification_settings")
@@ -106,23 +120,45 @@ function SettingsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const persist = (next: AppSettings, msg = "تم الحفظ") => {
-    setSettings(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setToast(msg);
+  const persistRemote = async (patch: Record<string, unknown>, msg: string) => {
+    const { error } = await supabase
+      .from("app_settings")
+      .update(patch as any)
+      .eq("id", 1);
+    if (error) {
+      setToast("تعذر الحفظ: " + error.message);
+    } else {
+      setToast(msg);
+    }
   };
 
-  const saveOrg = (e: React.FormEvent) => {
+  const saveOrg = async (e: React.FormEvent) => {
     e.preventDefault();
-    persist(settings, "تم حفظ معلومات المؤسسة");
+    await persistRemote(
+      {
+        org_name: settings.org.name,
+        org_phone: settings.org.phone,
+        org_address: settings.org.address,
+      },
+      "تم حفظ معلومات المؤسسة",
+    );
   };
-  const saveInventory = (e: React.FormEvent) => {
+  const saveInventory = async (e: React.FormEvent) => {
     e.preventDefault();
-    persist(settings, "تم حفظ إعدادات المخزون");
+    await persistRemote(
+      { critical_quantity: settings.inventory.criticalQuantity },
+      "تم حفظ إعدادات المخزون",
+    );
   };
-  const saveInvoices = (e: React.FormEvent) => {
+  const saveInvoices = async (e: React.FormEvent) => {
     e.preventDefault();
-    persist(settings, "تم حفظ إعدادات الفواتير");
+    await persistRemote(
+      {
+        whatsapp_message: settings.invoices.whatsappMessage,
+        show_sms_message: settings.invoices.showSmsMessage,
+      },
+      "تم حفظ إعدادات الفواتير",
+    );
   };
 
   // --- Backup ---
