@@ -206,15 +206,24 @@ function SettingsPage() {
     if (!file) return;
     setBusy("import");
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (parsed.settings) {
-          persist(
+          const next: AppSettings = {
+            org: { ...defaults.org, ...(parsed.settings.org ?? {}) },
+            inventory: { ...defaults.inventory, ...(parsed.settings.inventory ?? {}) },
+            invoices: { ...defaults.invoices, ...(parsed.settings.invoices ?? {}) },
+          };
+          setSettings(next);
+          await persistRemote(
             {
-              org: { ...defaults.org, ...(parsed.settings.org ?? {}) },
-              inventory: { ...defaults.inventory, ...(parsed.settings.inventory ?? {}) },
-              invoices: { ...defaults.invoices, ...(parsed.settings.invoices ?? {}) },
+              org_name: next.org.name,
+              org_phone: next.org.phone,
+              org_address: next.org.address,
+              critical_quantity: next.inventory.criticalQuantity,
+              whatsapp_message: next.invoices.whatsappMessage,
+              show_sms_message: next.invoices.showSmsMessage,
             },
             "تم استيراد الإعدادات من النسخة الاحتياطية",
           );
