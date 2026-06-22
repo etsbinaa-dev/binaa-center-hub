@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Save, Loader2 } from "lucide-react";
+import { ChevronDown, Save, Loader2, X as XIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,10 +67,15 @@ const SECTIONS: Section[] = [
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({ meta: [{ title: "الكميات — بِناء HUB" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    filter: search.filter === "critical" ? "critical" : undefined,
+  }),
   component: QuantitiesPage,
 });
 
 function QuantitiesPage() {
+  const { filter } = Route.useSearch();
+  const criticalOnly = filter === "critical";
   const initial = useMemo(() => {
     const m: Record<string, number> = {};
     for (const s of SECTIONS) for (const p of s.items) m[p.key] = 0;
@@ -192,15 +197,38 @@ function QuantitiesPage() {
     return `${date} ${time}`;
   };
 
+  const displayedSections = criticalOnly
+    ? SECTIONS.map((s) => ({
+        ...s,
+        items: s.items.filter((p) => (values[p.key] ?? 0) <= lowStockThreshold),
+      })).filter((s) => s.items.length > 0)
+    : SECTIONS;
+
   return (
     <AppShell moduleKey="inventory" title="الكميات">
       <div className="mx-auto max-w-2xl space-y-4 pb-32">
+        {criticalOnly && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-900">
+            <span>عرض المنتجات في المخزون الحرج فقط</span>
+            <Link
+              to="/inventory"
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-100"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+              إلغاء الفلتر
+            </Link>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-20 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
+        ) : displayedSections.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
+            لا توجد منتجات في المخزون الحرج حالياً.
+          </div>
         ) : (
-          SECTIONS.map((s) => (
+          displayedSections.map((s) => (
             <section
               key={s.category}
               className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"

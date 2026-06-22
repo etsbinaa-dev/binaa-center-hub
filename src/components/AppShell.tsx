@@ -16,6 +16,7 @@ import {
   LogOut,
   Wallet,
   Inbox,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -136,6 +137,16 @@ export function AppShell({
             >
               <Menu className="h-5 w-5" />
             </button>
+            {pathname !== "/" && (
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted sm:text-sm"
+                aria-label="الرجوع إلى الرئيسية"
+              >
+                <ArrowRight className="h-4 w-4" />
+                <span className="hidden sm:inline">الرئيسية</span>
+              </Link>
+            )}
             <h1 className="min-w-0 truncate text-lg font-bold sm:text-xl">{title}</h1>
             <div className="ms-auto flex items-center gap-2">
               <NotificationsBell />
