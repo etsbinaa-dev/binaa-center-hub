@@ -8,8 +8,6 @@ import {
   Package,
   User,
   Users,
-  BarChart3,
-  Activity,
   Settings,
   Menu,
   X,
