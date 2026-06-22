@@ -145,12 +145,12 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       supabaseAdmin
         .from("temp_entries")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .neq("status", "done"),
     ),
     supabaseAdmin
       .from("account_reminders")
       .select("amount, paid_amount, invoice:invoices(customer_name, amount, amount_manual, paid_amount)")
-      .neq("status", "paid"),
+      .neq("payment_status", "paid"),
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
