@@ -55,6 +55,8 @@ function HomePage() {
 }
 
 function Dashboard() {
+  const { role } = useAuth();
+  const isDelivery = role === "delivery";
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
