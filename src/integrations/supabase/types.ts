@@ -127,6 +127,8 @@ export type Database = {
       app_settings: {
         Row: {
           critical_quantity: number
+          daily_report_last_sent_date: string | null
+          daily_report_time: string
           id: number
           org_address: string
           org_name: string
@@ -137,6 +139,8 @@ export type Database = {
         }
         Insert: {
           critical_quantity?: number
+          daily_report_last_sent_date?: string | null
+          daily_report_time?: string
           id?: number
           org_address?: string
           org_name?: string
@@ -147,6 +151,8 @@ export type Database = {
         }
         Update: {
           critical_quantity?: number
+          daily_report_last_sent_date?: string | null
+          daily_report_time?: string
           id?: number
           org_address?: string
           org_name?: string
