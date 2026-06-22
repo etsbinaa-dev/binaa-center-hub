@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
+import { useRole } from "@/lib/roles";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,7 +55,7 @@ function HomePage() {
 }
 
 function Dashboard() {
-  const { role } = useAuth();
+  const role = useRole().role;
   const isDelivery = role === "delivery";
   const [stats, setStats] = useState<Stats | null>(null);
 
