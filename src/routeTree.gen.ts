@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as TrustRouteImport } from './routes/trust'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReceptionRouteImport } from './routes/reception'
@@ -32,6 +33,11 @@ import { Route as ApiPublicHooksAccountsFollowupScanRouteImport } from './routes
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrustRoute = TrustRouteImport.update({
+  id: '/trust',
+  path: '/trust',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/delivery/archive': typeof DeliveryArchiveRoute
   '/invoices/sent': typeof InvoicesSentRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/reception'
     | '/reports'
     | '/settings'
+    | '/trust'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/reception'
     | '/reports'
     | '/settings'
+    | '/trust'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/reception'
     | '/reports'
     | '/settings'
+    | '/trust'
     | '/users'
     | '/delivery/archive'
     | '/invoices/sent'
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   ReceptionRoute: typeof ReceptionRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  TrustRoute: typeof TrustRoute
   UsersRoute: typeof UsersRoute
   ApiPublicHooksAccountsFollowupScanRoute: typeof ApiPublicHooksAccountsFollowupScanRoute
 }
@@ -282,6 +295,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trust': {
+      id: '/trust'
+      path: '/trust'
+      fullPath: '/trust'
+      preLoaderRoute: typeof TrustRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -463,6 +483,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReceptionRoute: ReceptionRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  TrustRoute: TrustRoute,
   UsersRoute: UsersRoute,
   ApiPublicHooksAccountsFollowupScanRoute:
     ApiPublicHooksAccountsFollowupScanRoute,
