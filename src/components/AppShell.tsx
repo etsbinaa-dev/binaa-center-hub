@@ -44,10 +44,8 @@ const NAV: NavItem[] = [
   { key: "inventory", label: "الكميات", to: "/inventory", icon: Package },
   { key: "customers", label: "العملاء", to: "/customers", icon: User },
   { key: "users", label: "المستخدمون", to: "/users", icon: Users },
-  { key: "reports", label: "التقارير", to: "/reports", icon: BarChart3 },
   { key: "accounts_followup", label: "متابعة الدفع", to: "/accounts-followup", icon: Wallet },
   { key: "daily_payments", label: "الصندوق والمتابعة المؤقتة", to: "/daily-payments", icon: Wallet },
-  { key: "settings", label: "سجل النشاط", to: "/activity", icon: Activity },
   { key: "settings", label: "الإعدادات", to: "/settings", icon: Settings },
 ];
 
