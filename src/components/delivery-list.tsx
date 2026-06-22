@@ -193,7 +193,7 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                     <div className="grid grid-cols-2 gap-1">
                       <span className="text-muted-foreground">السائق:</span>
                       <span className="font-medium">{o.driver_name ?? "—"}</span>
-                      <span className="text-muted-foreground">البوانتور:</span>
+                      <span className="text-muted-foreground">المشرف:</span>
                       <span className="font-medium">{o.pointeur_name ?? "—"}</span>
                       <span className="text-muted-foreground">رقم الفاتورة:</span>
                       <span className="font-medium">{o.delivery_invoice_number ?? "—"}</span>
@@ -294,7 +294,7 @@ function StartDeliveryDialog({
   const submit = async () => {
     if (!order) return;
     if (!driver.trim()) return toast.error("اسم السائق مطلوب");
-    if (!pointeur.trim()) return toast.error("اسم البوانتور مطلوب");
+    if (!pointeur.trim()) return toast.error("اسم المشرف مطلوب");
     if (!file) return toast.error("نسخة الفاتورة الرقمية مطلوبة");
     const isOk = file.type.startsWith("image/") || file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     if (!isOk) return toast.error("الملف يجب أن يكون صورة أو PDF");
@@ -357,7 +357,7 @@ function StartDeliveryDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dlv-pointeur" className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5" />اسم البوانتور <span className="text-destructive">*</span>
+              <User className="h-3.5 w-3.5" />اسم المشرف <span className="text-destructive">*</span>
             </Label>
             <Input id="dlv-pointeur" value={pointeur} onChange={(e) => setPointeur(e.target.value)} placeholder="مثال: علي" />
           </div>
