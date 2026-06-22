@@ -247,6 +247,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
     `📝 قيود غير معالجة (${tempPendingRows.length}):`,
     ...tempLines,
     "",
+    `⏰ حسابات متأخرة (${overdueAccounts.length}):`,
     ...overdueLines,
     "",
     "📥 استقبال اليوم:",
