@@ -6,7 +6,6 @@ import {
   Package,
   User,
   Users,
-  BarChart3,
   Settings,
   type LucideIcon,
 } from "lucide-react";
