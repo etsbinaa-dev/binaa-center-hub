@@ -117,7 +117,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
     receptionsToday,
     quantities,
     houseOps,
-    tempPending,
+    tempPendingList,
     overdueAccountsList,
     threshold,
   ] = await Promise.all([
@@ -141,16 +141,14 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       .gte("created_at", iso),
     supabaseAdmin.from("quantities").select("label, quantity"),
     supabaseAdmin.from("house_cash_ops").select("op_type, amount"),
-    count(
-      supabaseAdmin
-        .from("temp_entries")
-        .select("id", { count: "exact", head: true })
-        .neq("status", "done"),
-    ),
+    supabaseAdmin
+      .from("temp_entries")
+      .select("kind, amount, description")
+      .neq("status", "done")
+      .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("account_reminders")
-      .select("amount, paid_amount, invoice:invoices(customer_name, amount, amount_manual, paid_amount)")
-      .neq("payment_status", "paid"),
+      .select("amount, paid_amount, status, invoice:invoices(customer_name, amount, amount_manual, paid_amount)"),
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
