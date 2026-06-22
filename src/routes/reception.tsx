@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyReceptionCreated } from "@/lib/reception-notify.functions";
 
 export const Route = createFileRoute("/reception")({
   head: () => ({ meta: [{ title: "الاستقبال — بِناء HUB" }] }),
