@@ -295,6 +295,15 @@ function ReceptionForm({
       .single();
     setSaving(false);
     if (error) return setError("تعذر الحفظ: " + error.message);
+    notifyReceptionCreated({
+      data: {
+        supplier: payload.supplier,
+        goods_type: payload.goods_type,
+        quantity: qty,
+        unit,
+        user_name: userName,
+      },
+    }).catch((e) => console.error("[reception:notify]", e));
     onCreated(data as Row);
   };
 
