@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
 
-const LOW_STOCK_THRESHOLD = 5;
+const DEFAULT_LOW_STOCK_THRESHOLD = 5;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
