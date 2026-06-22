@@ -106,6 +106,9 @@ function SettingsPage() {
                 : defaults.invoices.showSmsMessage,
           },
         });
+        const t = (row.daily_report_time as string | null) ?? "21:00:00";
+        // Keep just HH:MM for the <input type="time" />
+        setDailyReportTime(t.slice(0, 5));
       }
       setLoaded(true);
     })();
