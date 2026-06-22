@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,6 +55,8 @@ function HomePage() {
 }
 
 function Dashboard() {
+  const { role } = useAuth();
+  const isDelivery = role === "delivery";
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
@@ -150,15 +153,19 @@ function Dashboard() {
         <h3 className="mb-3 text-lg font-bold">ملخص اليوم</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard icon={ClipboardList} label="طلبات نشطة" value={stats ? fmt(stats.activeOrders) : "…"} to="/orders" />
-          <StatCard icon={Receipt} label="فواتير غير مرسلة" value={stats ? fmt(stats.unsentInvoices) : "…"} to="/invoices" />
+          {!isDelivery && (
+            <StatCard icon={Receipt} label="فواتير غير مرسلة" value={stats ? fmt(stats.unsentInvoices) : "…"} to="/invoices" />
+          )}
           <StatCard icon={Truck} label="توصيلات قيد التنفيذ" value={stats ? fmt(stats.inProgressDeliveries) : "…"} to="/delivery" />
-          <StatCard icon={Wallet} label="رصيد كيص الدار" value={stats ? fmtMoney(stats.houseBalance) : "…"} accent to="/daily-payments" />
+          {!isDelivery && (
+            <StatCard icon={Wallet} label="رصيد كيص الدار" value={stats ? fmtMoney(stats.houseBalance) : "…"} accent to="/daily-payments" />
+          )}
           <StatCard icon={Inbox} label="مدخلات استقبال اليوم" value={stats ? fmt(stats.todayReceptions) : "…"} to="/reception" />
         </div>
       </section>
 
       {/* القسم 2: تنبيهات */}
-      {stats && (stats.lowStock > 0 || stats.overdueAccounts > 0 || stats.pendingTempEntries > 0) && (
+      {!isDelivery && stats && (stats.lowStock > 0 || stats.overdueAccounts > 0 || stats.pendingTempEntries > 0) && (
         <section>
           <h3 className="mb-3 text-lg font-bold">تنبيهات فورية</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -196,6 +203,7 @@ function Dashboard() {
           </div>
         </section>
       )}
+
 
       {/* القسم 3: وصول سريع */}
       <section>
