@@ -39,7 +39,6 @@ const TILES: Tile[] = [
   { key: "inventory", to: "/inventory", label: "المخزون", description: "متابعة الأصناف والمستودعات.", icon: Package },
   { key: "customers", to: "/customers", label: "العملاء", description: "قاعدة بيانات العملاء وحساباتهم.", icon: User },
   { key: "users", to: "/users", label: "المستخدمون", description: "الموظفون والصلاحيات والأدوار.", icon: Users },
-  { key: "reports", to: "/reports", label: "التقارير", description: "تحليلات الأداء ولوحات المؤشرات.", icon: BarChart3 },
   { key: "settings", to: "/settings", label: "الإعدادات", description: "تفضيلات النظام والمؤسسة.", icon: Settings },
 ];
 
