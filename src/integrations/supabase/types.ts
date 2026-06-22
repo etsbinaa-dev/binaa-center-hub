@@ -526,6 +526,45 @@ export type Database = {
         }
         Relationships: []
       }
+      receptions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          goods_type: string
+          id: string
+          is_archived: boolean
+          notes: string | null
+          quantity: number
+          supplier: string
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          goods_type: string
+          id?: string
+          is_archived?: boolean
+          notes?: string | null
+          quantity: number
+          supplier: string
+          unit: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          goods_type?: string
+          id?: string
+          is_archived?: boolean
+          notes?: string | null
+          quantity?: number
+          supplier?: string
+          unit?: string
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
           allowed: boolean
