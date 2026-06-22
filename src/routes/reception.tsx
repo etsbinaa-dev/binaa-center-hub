@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyReceptionCreated } from "@/lib/reception-notify.functions";
 
 export const Route = createFileRoute("/reception")({
   head: () => ({ meta: [{ title: "الاستقبال — بِناء HUB" }] }),
@@ -294,6 +295,15 @@ function ReceptionForm({
       .single();
     setSaving(false);
     if (error) return setError("تعذر الحفظ: " + error.message);
+    notifyReceptionCreated({
+      data: {
+        supplier: payload.supplier,
+        goods_type: payload.goods_type,
+        quantity: qty,
+        unit,
+        user_name: userName,
+      },
+    }).catch((e) => console.error("[reception:notify]", e));
     onCreated(data as Row);
   };
 

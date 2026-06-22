@@ -54,6 +54,8 @@ const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
   { kind: "debt_reminder", label: "إشعار التذكير بالديون" },
   { kind: "invoice_module", label: "إشعار فرز وإرسال الفواتير" },
   { kind: "daily_payment", label: "إشعار التحصيل اليومي" },
+  { kind: "reception_new", label: "إشعار استقبال بضاعة جديدة" },
+  { kind: "daily_report", label: "التقرير اليومي التلقائي (21:00)" },
 ];
 
 function SettingsPage() {
