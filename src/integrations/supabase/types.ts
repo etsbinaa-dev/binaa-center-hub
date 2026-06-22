@@ -124,36 +124,36 @@ export type Database = {
         }
         Relationships: []
       }
-      app_users: {
+      app_settings: {
         Row: {
-          active: boolean
-          created_at: string
-          id: string
-          name: string
-          password: string
-          phone: string
-          role: string
+          critical_quantity: number
+          id: number
+          org_address: string
+          org_name: string
+          org_phone: string
+          show_sms_message: boolean
           updated_at: string
+          whatsapp_message: string
         }
         Insert: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          name: string
-          password: string
-          phone: string
-          role: string
+          critical_quantity?: number
+          id?: number
+          org_address?: string
+          org_name?: string
+          org_phone?: string
+          show_sms_message?: boolean
           updated_at?: string
+          whatsapp_message?: string
         }
         Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          name?: string
-          password?: string
-          phone?: string
-          role?: string
+          critical_quantity?: number
+          id?: number
+          org_address?: string
+          org_name?: string
+          org_phone?: string
+          show_sms_message?: boolean
           updated_at?: string
+          whatsapp_message?: string
         }
         Relationships: []
       }
