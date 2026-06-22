@@ -16,6 +16,7 @@ import {
   LogOut,
   Wallet,
   Inbox,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsBell } from "@/components/notifications-bell";
