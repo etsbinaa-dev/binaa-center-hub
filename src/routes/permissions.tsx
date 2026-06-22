@@ -41,6 +41,7 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   reports: "التقارير",
   accounts_followup: "متابعة الدفع",
   daily_payments: "الصندوق والمتابعة المؤقتة",
+  reception: "الاستقبال",
   settings: "الإعدادات",
 };
 
