@@ -7,6 +7,7 @@ import {
   User,
   Users,
   Settings,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
