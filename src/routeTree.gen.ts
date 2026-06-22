@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ReceptionRouteImport } from './routes/reception'
 import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as InvoicesRouteImport } from './routes/invoices'
@@ -41,6 +42,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceptionRoute = ReceptionRouteImport.update({
+  id: '/reception',
+  path: '/reception',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PermissionsRoute = PermissionsRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/permissions': typeof PermissionsRoute
+  '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/permissions': typeof PermissionsRoute
+  '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/permissions': typeof PermissionsRoute
+  '/reception': typeof ReceptionRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/orders'
     | '/permissions'
+    | '/reception'
     | '/reports'
     | '/settings'
     | '/users'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/orders'
     | '/permissions'
+    | '/reception'
     | '/reports'
     | '/settings'
     | '/users'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/orders'
     | '/permissions'
+    | '/reception'
     | '/reports'
     | '/settings'
     | '/users'
@@ -256,6 +268,7 @@ export interface RootRouteChildren {
   InvoicesRoute: typeof InvoicesRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
   PermissionsRoute: typeof PermissionsRoute
+  ReceptionRoute: typeof ReceptionRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
@@ -283,6 +296,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reception': {
+      id: '/reception'
+      path: '/reception'
+      fullPath: '/reception'
+      preLoaderRoute: typeof ReceptionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/permissions': {
@@ -440,6 +460,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesRoute: InvoicesRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
   PermissionsRoute: PermissionsRoute,
+  ReceptionRoute: ReceptionRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,
