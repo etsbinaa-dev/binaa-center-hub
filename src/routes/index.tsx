@@ -34,6 +34,7 @@ type Tile = {
 
 const TILES: Tile[] = [
   { key: "orders", to: "/orders", label: "الطلبات", description: "إدارة وتتبع طلبات العملاء.", icon: ClipboardList },
+  { key: "reception", to: "/reception", label: "الاستقبال", description: "تسجيل البضاعة الواردة ومتابعة المدخلات.", icon: Inbox },
   { key: "invoices", to: "/invoices", label: "فرز وإرسال", description: "استخراج بيانات الفواتير بـ OCR وإرسالها للعملاء عبر واتساب.", icon: Receipt },
   { key: "delivery", to: "/delivery", label: "التوصيل", description: "جدولة الشحنات ومتابعة السائقين.", icon: Truck },
   { key: "inventory", to: "/inventory", label: "المخزون", description: "متابعة الأصناف والمستودعات.", icon: Package },
