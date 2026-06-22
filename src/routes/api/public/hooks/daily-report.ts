@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/public/hooks/daily-report")({
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const result = await runDailyReport(supabaseAdmin);
-          return Response.json({ ok: true, ...result });
+          return Response.json({ ...result, ok: true });
         } catch (e: any) {
           console.error("[daily-report] failed", e);
           return Response.json({ ok: false, error: e?.message ?? "unknown" }, { status: 500 });
