@@ -57,9 +57,11 @@ function nouakchottNow(): { hour: number; minute: number; dateKey: string } {
 }
 
 const HOUSE_SIGN: Record<string, number> = {
-  deposit: 1,
-  withdraw: -1,
-  expense: -1,
+  central_to_house: 1,
+  add_cash: 1,
+  house_to_bank: -1,
+  house_to_central: -1,
+  withdraw_cash: -1,
 };
 
 type RunOptions = { force?: boolean };
@@ -143,12 +145,12 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       supabaseAdmin
         .from("temp_entries")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .neq("status", "done"),
     ),
     supabaseAdmin
       .from("account_reminders")
       .select("amount, paid_amount, invoice:invoices(customer_name, amount, amount_manual, paid_amount)")
-      .neq("status", "paid"),
+      .neq("payment_status", "paid"),
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
@@ -176,7 +178,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
           const name = o.customer?.name ?? "—";
           const details = (o.details ?? "").toString().trim().replace(/\s+/g, " ");
           const short = details.length > 120 ? details.slice(0, 120) + "…" : details || "—";
-          return `• ${name}: ${short}`;
+          return `• ${name} — ${short}`;
         });
 
   const invoiceLines =
@@ -207,33 +209,32 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       ? ["—"]
       : lowOrCritical.map((q: any) => {
           const qty = Number(q.quantity) || 0;
-          const tag = qty <= critQty ? "🔴 حرج" : "🟠 منخفض";
+          const tag = qty <= critQty ? "🔴" : "🟠";
           return `• ${q.label}: ${qty} ${tag}`;
         });
 
   const text = [
-    "📊 التقرير اليومي — بِناء HUB",
+    "📊 بِناء HUB — تقرير يومي",
     "",
     `📦 طلبات نشطة: ${activeOrdersCount}`,
-    `🧾 فواتير غير مرسلة: ${unsentInvoices.length}`,
-    `🚚 توصيلات نشطة: ${activeDeliveries.length}`,
-    `💵 رصيد كيص الدار: ${fmtMoney(balance)}`,
-    `📝 قيود مؤقتة غير معالجة: ${tempPending}`,
-    `⏰ حسابات متأخرة غير محصلة: ${overdueAccounts.length}`,
     "",
-    "🚚 تفاصيل التوصيلات النشطة:",
+    `🚚 توصيلات (${activeDeliveries.length}):`,
     ...deliveryLines,
     "",
-    "🧾 الفواتير غير المرسلة:",
+    `🧾 فواتير غير مرسلة (${unsentInvoices.length}):`,
     ...invoiceLines,
     "",
-    "⏰ الحسابات المتأخرة:",
+    `💵 كيص الدار: ${fmtMoney(balance)}`,
+    "",
+    `📝 قيود غير معالجة: ${tempPending}`,
+    "",
+    `⏰ حسابات متأخرة (${overdueAccounts.length}):`,
     ...overdueLines,
     "",
-    "📥 استقبال البضاعة اليوم:",
+    "📥 استقبال اليوم:",
     ...receptionLines,
     "",
-    "⚠️ المخزون المنخفض/الحرج:",
+    "⚠️ مخزون منخفض/حرج:",
     ...lowLines,
     "",
     `🕒 ${fmtTime()}`,
