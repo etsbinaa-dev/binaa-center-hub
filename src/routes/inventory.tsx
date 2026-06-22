@@ -67,10 +67,15 @@ const SECTIONS: Section[] = [
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({ meta: [{ title: "الكميات — بِناء HUB" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    filter: search.filter === "critical" ? "critical" : undefined,
+  }),
   component: QuantitiesPage,
 });
 
 function QuantitiesPage() {
+  const { filter } = Route.useSearch();
+  const criticalOnly = filter === "critical";
   const initial = useMemo(() => {
     const m: Record<string, number> = {};
     for (const s of SECTIONS) for (const p of s.items) m[p.key] = 0;
