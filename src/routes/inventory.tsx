@@ -200,7 +200,7 @@ function QuantitiesPage() {
   const displayedSections = criticalOnly
     ? SECTIONS.map((s) => ({
         ...s,
-        items: s.items.filter((p) => (values[p.key] ?? 0) <= lowStockThreshold),
+        items: s.items.filter((p) => (values[p.key] ?? 0) <= 50),
       })).filter((s) => s.items.length > 0)
     : SECTIONS;
 
@@ -209,7 +209,7 @@ function QuantitiesPage() {
       <div className="mx-auto max-w-2xl space-y-4 pb-32">
         {criticalOnly && (
           <div className="flex items-center justify-between gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-900">
-            <span>عرض المنتجات في المخزون الحرج فقط</span>
+            <span>المخزون الحرج والمنخفض</span>
             <Link
               to="/inventory"
               className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-100"
