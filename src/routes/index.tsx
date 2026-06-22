@@ -66,7 +66,7 @@ function Dashboard() {
       const [
         ordersActive,
         invoicesNew,
-        deliveriesInProgress,
+        deliveriesActive,
         houseOps,
         receptionsToday,
         quantities,
@@ -75,7 +75,10 @@ function Dashboard() {
       ] = await Promise.all([
         supabase.from("orders").select("id", { count: "exact", head: true }).neq("status", "archived"),
         supabase.from("invoices").select("id", { count: "exact", head: true }).eq("status", "new"),
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("delivery_status", "in_progress"),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .in("delivery_status", ["new", "in_progress"]),
         supabase.from("house_cash_ops").select("op_type, amount"),
         supabase
           .from("receptions")
@@ -109,7 +112,7 @@ function Dashboard() {
       setStats({
         activeOrders: ordersActive.count ?? 0,
         unsentInvoices: invoicesNew.count ?? 0,
-        inProgressDeliveries: deliveriesInProgress.count ?? 0,
+        inProgressDeliveries: deliveriesActive.count ?? 0,
         houseBalance: balance,
         todayReceptions: receptionsToday.count ?? 0,
         lowStock,
@@ -124,7 +127,7 @@ function Dashboard() {
 
   const fmt = (n: number) => n.toLocaleString("ar-DZ");
   const fmtMoney = (n: number) =>
-    n.toLocaleString("ar-DZ", { maximumFractionDigits: 2 }) + " دج";
+    n.toLocaleString("ar-DZ", { maximumFractionDigits: 2 }) + " MRO";
 
   return (
     <div className="space-y-8">
@@ -146,11 +149,11 @@ function Dashboard() {
       <section>
         <h3 className="mb-3 text-lg font-bold">ملخص اليوم</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={ClipboardList} label="طلبات نشطة" value={stats ? fmt(stats.activeOrders) : "…"} />
-          <StatCard icon={Receipt} label="فواتير غير مرسلة" value={stats ? fmt(stats.unsentInvoices) : "…"} />
-          <StatCard icon={Truck} label="توصيلات قيد التنفيذ" value={stats ? fmt(stats.inProgressDeliveries) : "…"} />
-          <StatCard icon={Wallet} label="رصيد كيص الدار" value={stats ? fmtMoney(stats.houseBalance) : "…"} accent />
-          <StatCard icon={Inbox} label="مدخلات استقبال اليوم" value={stats ? fmt(stats.todayReceptions) : "…"} />
+          <StatCard icon={ClipboardList} label="طلبات نشطة" value={stats ? fmt(stats.activeOrders) : "…"} to="/orders" />
+          <StatCard icon={Receipt} label="فواتير غير مرسلة" value={stats ? fmt(stats.unsentInvoices) : "…"} to="/invoices" />
+          <StatCard icon={Truck} label="توصيلات قيد التنفيذ" value={stats ? fmt(stats.inProgressDeliveries) : "…"} to="/delivery" />
+          <StatCard icon={Wallet} label="رصيد كيص الدار" value={stats ? fmtMoney(stats.houseBalance) : "…"} accent to="/daily-payments" />
+          <StatCard icon={Inbox} label="مدخلات استقبال اليوم" value={stats ? fmt(stats.todayReceptions) : "…"} to="/reception" />
         </div>
       </section>
 
@@ -166,6 +169,7 @@ function Dashboard() {
                 title="مخزون حرج"
                 value={`${fmt(stats.lowStock)} منتج`}
                 to="/inventory"
+                search={{ filter: "critical" }}
                 cta="عرض المخزون"
               />
             )}
@@ -212,14 +216,19 @@ function StatCard({
   label,
   value,
   accent,
+  to,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   accent?: boolean;
+  to: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <Link
+      to={to}
+      className="block rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+    >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="h-4 w-4" />
         {label}
@@ -227,7 +236,7 @@ function StatCard({
       <div className={`mt-2 text-xl font-extrabold ${accent ? "text-primary" : ""}`}>
         {value}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -238,6 +247,7 @@ function AlertCard({
   to,
   cta,
   tone,
+  search,
 }: {
   icon: LucideIcon;
   title: string;
@@ -245,6 +255,7 @@ function AlertCard({
   to: string;
   cta: string;
   tone: "warning" | "danger";
+  search?: Record<string, string>;
 }) {
   const styles =
     tone === "danger"
@@ -255,19 +266,22 @@ function AlertCard({
       ? "bg-red-600 text-white hover:bg-red-700"
       : "bg-amber-600 text-white hover:bg-amber-700";
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${styles}`}>
+    <Link
+      to={to}
+      search={search as never}
+      className={`block rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${styles}`}
+    >
       <div className="flex items-center gap-2 text-sm font-bold">
         <Icon className="h-5 w-5" />
         {title}
       </div>
       <div className="mt-2 text-2xl font-extrabold">{value}</div>
-      <Link
-        to={to}
+      <span
         className={`mt-3 inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-bold transition ${btn}`}
       >
         {cta}
-      </Link>
-    </div>
+      </span>
+    </Link>
   );
 }
 
