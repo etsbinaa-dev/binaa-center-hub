@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
 
-const DEFAULT_LOW_STOCK_THRESHOLD = 5;
+const DEFAULT_lowStockThreshold = 5;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
@@ -86,7 +86,7 @@ function QuantitiesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedLow, setSavedLow] = useState<Record<string, boolean>>({});
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_lowStockThreshold);
 
   useEffect(() => {
     (async () => {
@@ -117,7 +117,7 @@ function QuantitiesPage() {
               next[r.product_key] = r.quantity ?? 0;
               prevMap[r.product_key] = r.previous_quantity ?? 0;
               updMap[r.product_key] = r.updated_at;
-              low[r.product_key] = (r.quantity ?? 0) <= LOW_STOCK_THRESHOLD;
+              low[r.product_key] = (r.quantity ?? 0) <= lowStockThreshold;
             }
           }
           return next;
@@ -172,7 +172,7 @@ function QuantitiesPage() {
       const nextLow: Record<string, boolean> = {};
       for (const s of SECTIONS) {
         for (const p of s.items) {
-          const isLow = values[p.key] <= LOW_STOCK_THRESHOLD;
+          const isLow = values[p.key] <= lowStockThreshold;
           nextLow[p.key] = isLow;
           if (isLow && !savedLow[p.key]) newlyLow.push(p);
         }
@@ -224,7 +224,7 @@ function QuantitiesPage() {
                       const qa = values[a.key] ?? 0;
                       const qb = values[b.key] ?? 0;
                       const tier = (q: number) =>
-                        q <= LOW_STOCK_THRESHOLD ? 0 : q <= 50 ? 1 : 2;
+                        q <= lowStockThreshold ? 0 : q <= 50 ? 1 : 2;
                       const ta = tier(qa);
                       const tb = tier(qb);
                       if (ta !== tb) return ta - tb;
@@ -232,7 +232,7 @@ function QuantitiesPage() {
                     })
                     .map((p) => {
                     const qty = values[p.key];
-                    const critical = qty <= LOW_STOCK_THRESHOLD;
+                    const critical = qty <= lowStockThreshold;
                     const low = !critical && qty <= 50;
                     const tone = critical
                       ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
