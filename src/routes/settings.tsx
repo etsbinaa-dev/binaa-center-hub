@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { runDailyReportFn } from "@/lib/daily-report.functions";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "الإعدادات — بِناء HUB" }] }),
@@ -59,19 +62,24 @@ const NOTIFICATION_KINDS: { kind: string; label: string }[] = [
 ];
 
 function SettingsPage() {
+  const { isAdmin } = useAuth();
+  const sendDailyReportNow = useServerFn(runDailyReportFn);
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notifFlags, setNotifFlags] = useState<Record<string, boolean>>({});
   const [notifLoaded, setNotifLoaded] = useState(false);
+  const [dailyReportTime, setDailyReportTime] = useState<string>("21:00");
+  const [sendingNow, setSendingNow] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
         .from("app_settings")
         .select(
-          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity",
+          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, daily_report_time",
         )
         .eq("id", 1)
         .maybeSingle();
@@ -98,6 +106,9 @@ function SettingsPage() {
                 : defaults.invoices.showSmsMessage,
           },
         });
+        const t = (row.daily_report_time as string | null) ?? "21:00:00";
+        // Keep just HH:MM for the <input type="time" />
+        setDailyReportTime(t.slice(0, 5));
       }
       setLoaded(true);
     })();
@@ -499,6 +510,59 @@ function SettingsPage() {
                 </label>
               );
             })}
+            {isAdmin && (
+              <div className="mt-3 space-y-2 rounded-xl border border-border bg-background/50 px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium">وقت إرسال التقرير اليومي</span>
+                  <input
+                    type="time"
+                    dir="ltr"
+                    value={dailyReportTime}
+                    onChange={(e) => setDailyReportTime(e.target.value)}
+                    className="rounded-lg border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={savingTime}
+                    onClick={async () => {
+                      setSavingTime(true);
+                      const hhmm = (dailyReportTime || "21:00").slice(0, 5);
+                      const { error } = await supabase
+                        .from("app_settings")
+                        .update({ daily_report_time: hhmm + ":00" } as any)
+                        .eq("id", 1);
+                      setSavingTime(false);
+                      if (error) setToast("تعذر الحفظ: " + error.message);
+                      else setToast("تم حفظ وقت التقرير اليومي");
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                  >
+                    {savingTime ? "جاري الحفظ…" : "حفظ الوقت"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sendingNow}
+                    onClick={async () => {
+                      setSendingNow(true);
+                      try {
+                        const r: any = await sendDailyReportNow({});
+                        if (r?.ok) setToast("تم إرسال التقرير إلى المدير");
+                        else setToast("تعذر إرسال التقرير");
+                      } catch (e: any) {
+                        setToast("تعذر الإرسال: " + (e?.message ?? ""));
+                      } finally {
+                        setSendingNow(false);
+                      }
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-60"
+                  >
+                    {sendingNow ? "جاري الإرسال…" : "إرسال التقرير الآن"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Section>

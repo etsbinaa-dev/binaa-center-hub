@@ -37,13 +37,34 @@ function fmtTime(): string {
   }
 }
 
+// Returns current time in Africa/Nouakchott as { hour, minute, dateKey }
+function nouakchottNow(): { hour: number; minute: number; dateKey: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Nouakchott",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return {
+    hour: parseInt(get("hour"), 10),
+    minute: parseInt(get("minute"), 10),
+    dateKey: `${get("year")}-${get("month")}-${get("day")}`,
+  };
+}
+
 const HOUSE_SIGN: Record<string, number> = {
   deposit: 1,
   withdraw: -1,
   expense: -1,
 };
 
-export async function runDailyReport(supabaseAdmin: any) {
+type RunOptions = { force?: boolean };
+
+export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) {
   // Toggle gate
   const { data: settingsRow } = await supabaseAdmin
     .from("notification_settings")
@@ -51,8 +72,34 @@ export async function runDailyReport(supabaseAdmin: any) {
     .eq("kind", "daily_report")
     .maybeSingle();
   const enabled = !settingsRow || settingsRow.enabled !== false;
-  if (!enabled) {
-    return { ok: false, skipped: true };
+  if (!enabled && !opts.force) {
+    return { ok: false, skipped: true, reason: "disabled" };
+  }
+
+  // Read scheduled time + last-sent date
+  const { data: appRow } = await supabaseAdmin
+    .from("app_settings")
+    .select("daily_report_time, daily_report_last_sent_date")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const timeStr: string = (appRow as any)?.daily_report_time ?? "21:00:00";
+  const [thStr, tmStr] = timeStr.split(":");
+  const targetHour = parseInt(thStr, 10);
+  const targetMin = parseInt(tmStr, 10);
+  const now = nouakchottNow();
+
+  if (!opts.force) {
+    // Only fire if current time is within the 10-minute window starting at target
+    const nowMinutes = now.hour * 60 + now.minute;
+    const targetMinutes = targetHour * 60 + targetMin;
+    const diff = nowMinutes - targetMinutes;
+    if (diff < 0 || diff >= 10) {
+      return { ok: false, skipped: true, reason: "not_time" };
+    }
+    if ((appRow as any)?.daily_report_last_sent_date === now.dateKey) {
+      return { ok: false, skipped: true, reason: "already_sent_today" };
+    }
   }
 
   const startOfDay = new Date();
@@ -62,28 +109,29 @@ export async function runDailyReport(supabaseAdmin: any) {
   const count = (q: any) => q.then((r: any) => r.count ?? 0);
 
   const [
-    activeOrders,
-    unsentInvoices,
-    activeDeliveries,
+    activeOrdersCount,
+    unsentInvoicesList,
+    activeDeliveriesList,
     receptionsToday,
     quantities,
     houseOps,
     tempPending,
-    overdueAccounts,
+    overdueAccountsList,
     threshold,
   ] = await Promise.all([
     count(
       supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).neq("status", "archived"),
     ),
-    count(
-      supabaseAdmin.from("invoices").select("id", { count: "exact", head: true }).eq("status", "new"),
-    ),
-    count(
-      supabaseAdmin
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .in("delivery_status", ["new", "in_progress"]),
-    ),
+    supabaseAdmin
+      .from("invoices")
+      .select("customer_name")
+      .eq("status", "new")
+      .order("created_at", { ascending: false }),
+    supabaseAdmin
+      .from("orders")
+      .select("details, customer:customers(name)")
+      .in("delivery_status", ["new", "in_progress"])
+      .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("receptions")
       .select("supplier, goods_type, quantity, unit")
@@ -97,12 +145,10 @@ export async function runDailyReport(supabaseAdmin: any) {
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
     ),
-    count(
-      supabaseAdmin
-        .from("account_reminders")
-        .select("id", { count: "exact", head: true })
-        .neq("status", "paid"),
-    ),
+    supabaseAdmin
+      .from("account_reminders")
+      .select("amount, paid_amount, invoice:invoices(customer_name, amount, amount_manual, paid_amount)")
+      .neq("status", "paid"),
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
@@ -115,6 +161,39 @@ export async function runDailyReport(supabaseAdmin: any) {
   const lowOrCritical = (quantities.data ?? []).filter(
     (q: any) => (Number(q.quantity) || 0) <= Math.max(critQty, 50),
   );
+
+  const fmtMoney = (n: number) =>
+    n.toLocaleString("ar-DZ", { maximumFractionDigits: 2 }) + " MRO";
+
+  const unsentInvoices = (unsentInvoicesList.data ?? []) as any[];
+  const activeDeliveries = (activeDeliveriesList.data ?? []) as any[];
+  const overdueAccounts = (overdueAccountsList.data ?? []) as any[];
+
+  const deliveryLines =
+    activeDeliveries.length === 0
+      ? ["—"]
+      : activeDeliveries.map((o) => {
+          const name = o.customer?.name ?? "—";
+          const details = (o.details ?? "").toString().trim().replace(/\s+/g, " ");
+          const short = details.length > 120 ? details.slice(0, 120) + "…" : details || "—";
+          return `• ${name}: ${short}`;
+        });
+
+  const invoiceLines =
+    unsentInvoices.length === 0
+      ? ["—"]
+      : unsentInvoices.map((i) => `• ${i.customer_name ?? "—"}`);
+
+  const overdueLines =
+    overdueAccounts.length === 0
+      ? ["—"]
+      : overdueAccounts.map((r) => {
+          const inv = r.invoice ?? {};
+          const total = Number(inv.amount_manual ?? inv.amount ?? r.amount ?? 0);
+          const paid = Number(inv.paid_amount ?? r.paid_amount ?? 0);
+          const remaining = Math.max(total - paid, 0);
+          return `• ${inv.customer_name ?? "—"}: ${fmtMoney(remaining)}`;
+        });
 
   const receptionLines =
     (receptionsToday.data ?? []).length === 0
@@ -132,18 +211,24 @@ export async function runDailyReport(supabaseAdmin: any) {
           return `• ${q.label}: ${qty} ${tag}`;
         });
 
-  const fmtMoney = (n: number) =>
-    n.toLocaleString("ar-DZ", { maximumFractionDigits: 2 }) + " MRO";
-
   const text = [
     "📊 التقرير اليومي — بِناء HUB",
     "",
-    `📦 طلبات نشطة: ${activeOrders}`,
-    `🧾 فواتير غير مرسلة: ${unsentInvoices}`,
-    `🚚 توصيلات نشطة: ${activeDeliveries}`,
+    `📦 طلبات نشطة: ${activeOrdersCount}`,
+    `🧾 فواتير غير مرسلة: ${unsentInvoices.length}`,
+    `🚚 توصيلات نشطة: ${activeDeliveries.length}`,
     `💵 رصيد كيص الدار: ${fmtMoney(balance)}`,
     `📝 قيود مؤقتة غير معالجة: ${tempPending}`,
-    `⏰ حسابات متأخرة غير محصلة: ${overdueAccounts}`,
+    `⏰ حسابات متأخرة غير محصلة: ${overdueAccounts.length}`,
+    "",
+    "🚚 تفاصيل التوصيلات النشطة:",
+    ...deliveryLines,
+    "",
+    "🧾 الفواتير غير المرسلة:",
+    ...invoiceLines,
+    "",
+    "⏰ الحسابات المتأخرة:",
+    ...overdueLines,
     "",
     "📥 استقبال البضاعة اليوم:",
     ...receptionLines,
@@ -156,12 +241,25 @@ export async function runDailyReport(supabaseAdmin: any) {
 
   void sendTelegram;
   const tg = await sendTelegramToAdmin(text);
+
+  if (tg.ok && !opts.force) {
+    await supabaseAdmin
+      .from("app_settings")
+      .update({ daily_report_last_sent_date: now.dateKey })
+      .eq("id", 1);
+  }
+
   return { ok: tg.ok, sent: tg.sent };
 }
 
 export const runDailyReportFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    return runDailyReport(supabaseAdmin);
+    return runDailyReport(supabaseAdmin, { force: true });
   });
