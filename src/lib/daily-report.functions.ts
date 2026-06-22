@@ -178,7 +178,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
           const name = o.customer?.name ?? "—";
           const details = (o.details ?? "").toString().trim().replace(/\s+/g, " ");
           const short = details.length > 120 ? details.slice(0, 120) + "…" : details || "—";
-          return `• ${name}: ${short}`;
+          return `• ${name} — ${short}`;
         });
 
   const invoiceLines =
@@ -209,33 +209,32 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       ? ["—"]
       : lowOrCritical.map((q: any) => {
           const qty = Number(q.quantity) || 0;
-          const tag = qty <= critQty ? "🔴 حرج" : "🟠 منخفض";
+          const tag = qty <= critQty ? "🔴" : "🟠";
           return `• ${q.label}: ${qty} ${tag}`;
         });
 
   const text = [
-    "📊 التقرير اليومي — بِناء HUB",
+    "📊 بِناء HUB — تقرير يومي",
     "",
     `📦 طلبات نشطة: ${activeOrdersCount}`,
-    `🧾 فواتير غير مرسلة: ${unsentInvoices.length}`,
-    `🚚 توصيلات نشطة: ${activeDeliveries.length}`,
-    `💵 رصيد كيص الدار: ${fmtMoney(balance)}`,
-    `📝 قيود مؤقتة غير معالجة: ${tempPending}`,
-    `⏰ حسابات متأخرة غير محصلة: ${overdueAccounts.length}`,
     "",
-    "🚚 تفاصيل التوصيلات النشطة:",
+    `🚚 توصيلات (${activeDeliveries.length}):`,
     ...deliveryLines,
     "",
-    "🧾 الفواتير غير المرسلة:",
+    `🧾 فواتير غير مرسلة (${unsentInvoices.length}):`,
     ...invoiceLines,
     "",
-    "⏰ الحسابات المتأخرة:",
+    `💵 كيص الدار: ${fmtMoney(balance)}`,
+    "",
+    `📝 قيود غير معالجة: ${tempPending}`,
+    "",
+    `⏰ حسابات متأخرة (${overdueAccounts.length}):`,
     ...overdueLines,
     "",
-    "📥 استقبال البضاعة اليوم:",
+    "📥 استقبال اليوم:",
     ...receptionLines,
     "",
-    "⚠️ المخزون المنخفض/الحرج:",
+    "⚠️ مخزون منخفض/حرج:",
     ...lowLines,
     "",
     `🕒 ${fmtTime()}`,
