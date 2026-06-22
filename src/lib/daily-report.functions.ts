@@ -57,9 +57,11 @@ function nouakchottNow(): { hour: number; minute: number; dateKey: string } {
 }
 
 const HOUSE_SIGN: Record<string, number> = {
-  deposit: 1,
-  withdraw: -1,
-  expense: -1,
+  central_to_house: 1,
+  add_cash: 1,
+  house_to_bank: -1,
+  house_to_central: -1,
+  withdraw_cash: -1,
 };
 
 type RunOptions = { force?: boolean };
