@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+
 import {
   Search,
   Upload,
@@ -73,12 +74,27 @@ type Invoice = {
 
 
 export function InvoicesList({ status }: { status: "new" | "sent" }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [importOpen, setImportOpen] = useState(false);
   const [viewing, setViewing] = useState<Invoice | null>(null);
   const [editing, setEditing] = useState<Invoice | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
+  const extract = useServerFn(extractInvoiceFields);
+
+  const { data: waMessage = "" } = useQuery<string>({
+    queryKey: ["app_settings", "whatsapp_message"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("whatsapp_message")
+        .eq("id", 1)
+        .maybeSingle();
+      return (data as any)?.whatsapp_message ?? "";
+    },
+    staleTime: 60_000,
+  });
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["invoices", status, search],
@@ -150,6 +166,105 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     onError: (e: Error) => toast.error("تعذر الحذف: " + e.message),
   });
 
+  async function fileToBase64(f: File): Promise<string> {
+    const buf = await f.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    }
+    return btoa(binary);
+  }
+
+  async function uploadFile(f: File): Promise<string> {
+    const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${user?.id ?? "anon"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, f, {
+      contentType: f.type || "image/jpeg",
+      upsert: false,
+    });
+    if (error) throw error;
+    return path;
+  }
+
+  async function processOne(f: File): Promise<"ok" | "failed" | "missing"> {
+    const fallbackInv = f.name.replace(/\.[^.]+$/, "");
+    let customer_name = "غير معروف";
+    let customer_phone = "";
+    let invoice_number = fallbackInv;
+    let amount: number | null = null;
+    let missingFlag = false;
+
+    try {
+      const b64 = await fileToBase64(f);
+      const extracted = await extract({
+        data: { imageBase64: b64, mimeType: f.type || "image/jpeg" },
+      });
+      if (extracted.customer_name) customer_name = extracted.customer_name;
+      if (extracted.customer_phone) customer_phone = extracted.customer_phone;
+      if (extracted.invoice_number) invoice_number = extracted.invoice_number;
+      if (extracted.amount != null) amount = extracted.amount;
+      if (!extracted.customer_name && !extracted.customer_phone) {
+        missingFlag = true;
+        toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+      } else if (!extracted.customer_phone) {
+        toast.warning(`${f.name}: No phone number found`);
+      }
+    } catch (e) {
+      console.error("[invoice-extract] OCR failed for", f.name, e);
+      toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
+    }
+
+    try {
+      const path = await uploadFile(f);
+      const { error } = await supabase.from("invoices").insert({
+        customer_name,
+        customer_phone,
+        invoice_number,
+        amount,
+        image_path: path,
+        status: "new",
+        created_by: user?.id ?? null,
+      });
+      if (error) throw error;
+      return missingFlag ? "missing" : "ok";
+    } catch (e) {
+      console.error("[invoice-extract] save failed", f.name, e);
+      toast.error(`${f.name}: تعذر حفظ الفاتورة`);
+      return "failed";
+    }
+  }
+
+  async function handleFilesSelected(files: File[]) {
+    if (files.length === 0) return;
+    setImporting(true);
+    try {
+      const results = await Promise.all(files.map((f) => processOne(f)));
+      const ok = results.filter((r) => r === "ok" || r === "missing").length;
+      const failed = results.filter((r) => r === "failed").length;
+      if (ok > 0) {
+        toast.success(`تم استيراد ${ok} فاتورة`);
+        logActivity({
+          module: "invoices",
+          action: "import",
+          description: `استيراد ${ok} فاتورة جديدة`,
+        });
+        for (let i = 0; i < ok; i++) {
+          notify("invoice_new", "تمت إضافة فاتورة جديدة غير مرسلة.");
+        }
+      }
+      if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    } catch (e) {
+      console.error("[invoice-extract] bulk failed", e);
+      toast.error("تعذر إكمال الاستيراد");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Search + Import */}
@@ -163,9 +278,24 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
             className="pe-9"
           />
         </div>
-        <Button onClick={() => setImportOpen(true)} className="gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            void handleFilesSelected(files);
+          }}
+        />
+        <Button
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          className="gap-2"
+        >
           <Upload className="h-4 w-4" />
-          استيراد فواتير
+          {importing ? "جارٍ الاستيراد…" : "استيراد فواتير"}
         </Button>
       </div>
 
@@ -187,6 +317,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
             <InvoiceCard
               key={inv.id}
               invoice={inv}
+              waMessage={waMessage}
               onView={() => setViewing(inv)}
               onEdit={() => setEditing(inv)}
               onMarkSent={() => markSent.mutate({ id: inv.id, invoice_number: inv.invoice_number })}
@@ -198,7 +329,6 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
         </div>
       )}
 
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <ViewDialog invoice={viewing} onOpenChange={(o) => !o && setViewing(null)} />
       <EditDialog
         invoice={editing}
@@ -208,8 +338,10 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
   );
 }
 
+
 function InvoiceCard({
   invoice,
+  waMessage,
   onView,
   onEdit,
   onMarkSent,
@@ -218,6 +350,7 @@ function InvoiceCard({
   canDelete,
 }: {
   invoice: Invoice;
+  waMessage: string;
   onView: () => void;
   onEdit: () => void;
   onMarkSent: () => void;
@@ -228,7 +361,10 @@ function InvoiceCard({
   const thumb = useSignedUrl(invoice.image_path);
 
   const phoneDigits = invoice.customer_phone.replace(/[^\d]/g, "");
-  const waLink = `https://wa.me/${phoneDigits}`;
+  const waLink = waMessage
+    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMessage)}`
+    : `https://wa.me/${phoneDigits}`;
+
 
   async function copyImage(): Promise<boolean> {
     if (!invoice.image_path) return false;
@@ -417,183 +553,6 @@ function ViewDialog({
   );
 }
 
-function ImportDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  const extract = useServerFn(extractInvoiceFields);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [bulkFiles, setBulkFiles] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  async function fileToBase64(f: File): Promise<string> {
-    const buf = await f.arrayBuffer();
-    let binary = "";
-    const bytes = new Uint8Array(buf);
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode.apply(
-        null,
-        Array.from(bytes.subarray(i, i + chunk)),
-      );
-    }
-    return btoa(binary);
-  }
-
-  async function extractFromFile(f: File) {
-    const b64 = await fileToBase64(f);
-    return extract({ data: { imageBase64: b64, mimeType: f.type || "image/jpeg" } });
-  }
-
-  function reset() {
-    setBulkFiles([]);
-    if (fileRef.current) fileRef.current.value = "";
-  }
-
-  async function uploadFile(f: File): Promise<string> {
-    const ext = (f.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `${user?.id ?? "anon"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from(BUCKET).upload(path, f, {
-      contentType: f.type || "image/jpeg",
-      upsert: false,
-    });
-    if (error) throw error;
-    return path;
-  }
-
-  async function handleBulk() {
-    if (bulkFiles.length === 0) return;
-    setBusy(true);
-    let ok = 0;
-    let missing = 0;
-    let failed = 0;
-    try {
-      for (const f of bulkFiles) {
-        const fallbackInv = f.name.replace(/\.[^.]+$/, "");
-        let customer_name = "غير معروف";
-        let customer_phone = "";
-        let invoice_number = fallbackInv;
-        let amount: number | null = null;
-
-        try {
-          const extracted = await extractFromFile(f);
-          console.debug("[invoice-extract] OCR raw text for", f.name, "\n", extracted.raw_text);
-          console.debug("[invoice-extract] parsed", f.name, {
-            customer_name: extracted.customer_name,
-            customer_phone: extracted.customer_phone,
-            invoice_number: extracted.invoice_number,
-            amount: extracted.amount,
-            error: extracted.error,
-          });
-
-          if (extracted.customer_name) customer_name = extracted.customer_name;
-          if (extracted.customer_phone) customer_phone = extracted.customer_phone;
-          if (extracted.invoice_number) invoice_number = extracted.invoice_number;
-          if (extracted.amount != null) amount = extracted.amount;
-
-          if (!extracted.customer_name && !extracted.customer_phone) {
-            missing++;
-            toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
-          } else if (!extracted.customer_phone) {
-            toast.warning(`${f.name}: No phone number found`);
-          }
-        } catch (e) {
-          console.error("[invoice-extract] OCR failed for", f.name, e);
-          toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
-        }
-
-        try {
-          const path = await uploadFile(f);
-          const { error } = await supabase.from("invoices").insert({
-            customer_name,
-            customer_phone,
-            invoice_number,
-            amount,
-            image_path: path,
-            status: "new",
-            created_by: user?.id ?? null,
-          });
-          if (error) throw error;
-          ok++;
-
-        } catch (e) {
-          failed++;
-          console.error("[invoice-extract] save failed", f.name, e);
-          toast.error(`${f.name}: تعذر حفظ الفاتورة`);
-        }
-      }
-
-      if (ok > 0) {
-        toast.success(`تم استيراد ${ok} فاتورة`);
-        logActivity({
-          module: "invoices",
-          action: "import",
-          description: `استيراد ${ok} فاتورة جديدة`,
-        });
-        for (let i = 0; i < ok; i++) {
-          notify("invoice_new", "تمت إضافة فاتورة جديدة غير مرسلة.");
-        }
-      }
-      if (missing > 0) console.warn(`[invoice-extract] ${missing} invoice(s) without customer data`);
-      if (failed > 0 && ok === 0) toast.error(`فشل استيراد ${failed} فاتورة`);
-
-      qc.invalidateQueries({ queryKey: ["invoices"] });
-      if (ok > 0) {
-        reset();
-        onOpenChange(false);
-      }
-    } catch (e) {
-      console.error("[invoice-extract] bulk failed", e);
-      toast.error("تعذر إكمال الاستيراد");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) reset();
-        onOpenChange(o);
-      }}
-    >
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>استيراد فواتير</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <Input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => setBulkFiles(Array.from(e.target.files ?? []))}
-          />
-          <Button
-            onClick={handleBulk}
-            disabled={busy || bulkFiles.length === 0}
-            className="w-full"
-          >
-            {busy ? "جارٍ الاستيراد…" : `استيراد ${bulkFiles.length || ""} فاتورة`}
-          </Button>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            إغلاق
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function EditDialog({
   invoice,
