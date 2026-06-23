@@ -44,46 +44,6 @@ async function isKindEnabled(supabaseAdmin: any, kind: string): Promise<boolean>
   }
 }
 
-// --- Settings ---
-export const getFollowupSettings = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await ensureAdmin(context);
-    const { data, error } = await context.supabase
-      .from("accounts_followup_settings" as any)
-      .select("threshold_amount, initial_delay_days, snooze_days")
-      .eq("id", 1)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return (
-      data ?? {
-        threshold_amount: 50000,
-        initial_delay_days: 2,
-        snooze_days: 3,
-      }
-    );
-  });
-
-export const updateFollowupSettings = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z
-      .object({
-        threshold_amount: z.number().nonnegative(),
-        initial_delay_days: z.number().int().min(1).max(60),
-        snooze_days: z.number().int().min(1).max(60),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    await ensureAdmin(context);
-    const { error } = await context.supabase
-      .from("accounts_followup_settings" as any)
-      .upsert({ id: 1, ...data });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
 // --- Invoice amount ---
 export const setInvoiceAmount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -154,236 +114,82 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
   });
 
-
-
-// --- Listing ---
-export const listMajorAccounts = createServerFn({ method: "GET" })
+// --- Listing: grouped by customer_phone ---
+export const listFollowupGroups = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureAdmin(context);
-
-    const settings = await context.supabase
-      .from("accounts_followup_settings" as any)
-      .select("threshold_amount, initial_delay_days, snooze_days")
-      .eq("id", 1)
-      .maybeSingle();
-    const threshold = Number(((settings.data as any)?.threshold_amount) ?? 50000);
-
     const { data: invoices, error } = await context.supabase
       .from("invoices")
       .select(
         "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
       )
       .eq("status", "sent")
-      .gte("amount", threshold)
+      .neq("payment_status", "paid")
       .order("sent_at", { ascending: false });
     if (error) throw new Error(error.message);
-
-    const ids = (invoices ?? []).map((i: any) => i.id);
-    let reminders: any[] = [];
-    if (ids.length) {
-      const { data: r, error: re } = await context.supabase
-        .from("account_reminders" as any)
-        .select("*")
-        .in("invoice_id", ids)
-        .order("created_at", { ascending: false });
-      if (re) throw new Error(re.message);
-      reminders = r ?? [];
-    }
-    return { settings: settings.data, invoices: invoices ?? [], reminders };
+    return { invoices: invoices ?? [] };
   });
 
-// --- Respond ---
-export const respondReminder = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z
-      .object({
-        reminder_id: z.string().uuid(),
-        response: z.enum(["paid", "not_paid", "snoozed"]),
-      })
-      .parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    await ensureAdmin(context);
-
-    const { data: rem, error: re } = await context.supabase
-      .from("account_reminders" as any)
-      .select("id, invoice_id")
-      .eq("id", data.reminder_id)
-      .maybeSingle();
-    if (re) throw new Error(re.message);
-    if (!rem) throw new Error("Reminder not found");
-
-    const settings = await context.supabase
-      .from("accounts_followup_settings" as any)
-      .select("snooze_days")
-      .eq("id", 1)
-      .maybeSingle();
-    const snoozeDays = Number(((settings.data as any)?.snooze_days) ?? 3);
-
-    const now = new Date();
-    const update: any = {
-      status: data.response,
-      responded_at: now.toISOString(),
-      responded_by: context.userId,
-    };
-    if (data.response === "not_paid" || data.response === "snoozed") {
-      const next = new Date(now.getTime() + snoozeDays * 86400000);
-      update.next_remind_at = next.toISOString();
-    } else {
-      update.next_remind_at = null;
-    }
-
-    const { error: ue } = await context.supabase
-      .from("account_reminders" as any)
-      .update(update)
-      .eq("id", data.reminder_id);
-    if (ue) throw new Error(ue.message);
-
-    if (data.response === "paid") {
-      await context.supabase
-        .from("invoices")
-        .update({ payment_status: "paid", paid_at: now.toISOString() })
-        .eq("id", (rem as any).invoice_id);
-    }
-    return { ok: true };
-  });
-
-// --- Scan & dispatch (used by both manual button and the cron public route) ---
+// --- Scan & dispatch (reminders after 1 day, max 1 telegram per day per invoice) ---
 export async function runFollowupScan(supabaseAdmin: any) {
-  const { data: s } = await supabaseAdmin
-    .from("accounts_followup_settings")
-    .select("threshold_amount, initial_delay_days, snooze_days")
-    .eq("id", 1)
-    .maybeSingle();
-  const threshold = Number(s?.threshold_amount ?? 50000);
-  const initialDays = Number(s?.initial_delay_days ?? 2);
-
   const now = new Date();
   const nowIso = now.toISOString();
-  const cutoff = new Date(now.getTime() - initialDays * 86400000).toISOString();
+  const cutoff = new Date(now.getTime() - 1 * 86400000).toISOString();
+  const oneDayAgo = cutoff;
 
-  // 1. SENT invoices that need a FIRST reminder
+  // SENT, unpaid invoices, sent at least 1 day ago
   const { data: invoices } = await supabaseAdmin
     .from("invoices")
-    .select("id, customer_name, customer_phone, invoice_number, amount, created_at, sent_at")
-    .gte("amount", threshold)
-    .eq("payment_status", "unpaid")
+    .select(
+      "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, created_at, sent_at, last_reminder_at",
+    )
     .eq("status", "sent")
+    .neq("payment_status", "paid")
     .not("sent_at", "is", null)
     .lte("sent_at", cutoff);
 
-  const created: any[] = [];
+  let sent = 0;
   for (const inv of invoices ?? []) {
-    // skip if an open reminder already exists
-    const { data: existing } = await supabaseAdmin
-      .from("account_reminders")
-      .select("id")
-      .eq("invoice_id", inv.id)
-      .in("status", ["pending"])
-      .limit(1);
-    if (existing && existing.length > 0) continue;
+    // skip if a telegram reminder was sent within last 24h
+    if (inv.last_reminder_at && inv.last_reminder_at > oneDayAgo) continue;
 
-    const msg = `Customer ${inv.customer_name} has a large invoice. Has he paid?`;
-    const { data: ins } = await supabaseAdmin
-      .from("account_reminders")
-      .insert({ invoice_id: inv.id, status: "pending", message: msg, due_at: nowIso })
-      .select("id")
-      .single();
-
-    await supabaseAdmin
-      .from("invoices")
-      .update({ last_reminder_at: nowIso })
-      .eq("id", inv.id);
+    const amt = Number(inv.amount ?? 0);
+    const paid = Number(inv.paid_amount ?? 0);
+    const remaining = Math.max(0, amt - paid);
 
     const tgText = [
-      "💰 متابعة حسابات",
+      "💰 تذكير حساب متأخر",
       "",
-      msg,
-      `🧾 رقم الفاتورة: ${inv.invoice_number}`,
-      inv.amount != null ? `💵 المبلغ: ${inv.amount}` : "",
-      `📞 ${inv.customer_phone}`,
+      `👤 ${inv.customer_name ?? "—"}`,
+      `📞 ${inv.customer_phone ?? "—"}`,
+      `🧾 فاتورة: ${inv.invoice_number ?? "—"}`,
+      amt > 0 ? `💵 الإجمالي: ${amt.toLocaleString()}` : "",
+      paid > 0 ? `✅ المدفوع: ${paid.toLocaleString()}` : "",
+      `🔴 المتبقي: ${remaining.toLocaleString()} MRO`,
+      `📅 أُرسلت: ${inv.sent_at ? new Date(inv.sent_at).toLocaleDateString("ar") : "—"}`,
       "",
       `🕒 ${fmtTime()}`,
     ]
       .filter(Boolean)
       .join("\n");
-    const enabled = await isKindEnabled(supabaseAdmin, "large_account");
+
+    const enabled = await isKindEnabled(supabaseAdmin, "debt_reminder");
     const tg = enabled
       ? await sendTelegram(tgText)
       : { ok: false, sent: 0, errors: ["disabled"] };
-    if (!enabled) console.info("[followup] telegram skipped (disabled): large_account");
-    if (tg.ok && ins?.id) {
+    if (!enabled) console.info("[followup] telegram skipped (disabled): debt_reminder");
+
+    if (tg.ok) {
       await supabaseAdmin
-        .from("account_reminders")
-        .update({ telegram_sent_at: nowIso })
-        .eq("id", ins.id);
+        .from("invoices")
+        .update({ last_reminder_at: nowIso })
+        .eq("id", inv.id);
+      sent += 1;
     }
-    created.push(ins?.id);
   }
 
-  // 2. Snoozed / not_paid reminders whose next_remind_at has passed -> re-open as new pending
-  const { data: dueAgain } = await supabaseAdmin
-    .from("account_reminders")
-    .select("id, invoice_id")
-    .in("status", ["snoozed", "not_paid"])
-    .lte("next_remind_at", nowIso);
-
-  for (const r of dueAgain ?? []) {
-    // ensure invoice still unpaid
-    const { data: inv } = await supabaseAdmin
-      .from("invoices")
-      .select("id, customer_name, customer_phone, invoice_number, amount, payment_status")
-      .eq("id", r.invoice_id)
-      .maybeSingle();
-    if (!inv || inv.payment_status === "paid") continue;
-
-    const msg = `Customer ${inv.customer_name} has a large invoice. Has he paid?`;
-    const { data: ins } = await supabaseAdmin
-      .from("account_reminders")
-      .insert({ invoice_id: inv.id, status: "pending", message: msg, due_at: nowIso })
-      .select("id")
-      .single();
-
-    // mark old as closed so we don't re-trigger
-    await supabaseAdmin
-      .from("account_reminders")
-      .update({ next_remind_at: null })
-      .eq("id", r.id);
-
-    await supabaseAdmin
-      .from("invoices")
-      .update({ last_reminder_at: nowIso })
-      .eq("id", inv.id);
-
-    const tgText = [
-      "🔁 تذكير حسابات",
-      "",
-      msg,
-      `🧾 رقم الفاتورة: ${inv.invoice_number}`,
-      inv.amount != null ? `💵 المبلغ: ${inv.amount}` : "",
-      `📞 ${inv.customer_phone}`,
-      "",
-      `🕒 ${fmtTime()}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    const enabled2 = await isKindEnabled(supabaseAdmin, "debt_reminder");
-    const tg = enabled2
-      ? await sendTelegram(tgText)
-      : { ok: false, sent: 0, errors: ["disabled"] };
-    if (!enabled2) console.info("[followup] telegram skipped (disabled): debt_reminder");
-    if (tg.ok && ins?.id) {
-      await supabaseAdmin
-        .from("account_reminders")
-        .update({ telegram_sent_at: nowIso })
-        .eq("id", ins.id);
-    }
-    created.push(ins?.id);
-  }
-
-  return { created: created.length };
+  return { sent, scanned: (invoices ?? []).length };
 }
 
 export const runFollowupScanFn = createServerFn({ method: "POST" })
