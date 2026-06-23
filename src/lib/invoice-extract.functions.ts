@@ -11,55 +11,71 @@ type Output = {
   error?: string;
 };
 
+const SYSTEM = `أنت تستخرج بيانات من صور فواتير "مؤسسة بناء - rimsoft". كل الفواتير لها نفس التصميم.
 
-const SYSTEM = `أنت تستخرج بيانات من صور فواتير عربية/إنجليزية.
-أعد JSON فقط بالحقول التالية بدون أي شرح:
+أعد JSON فقط بدون أي شرح بالحقول التالية:
 {
-  "raw_text": "النص الكامل المستخرج من الصورة كما هو سطراً بسطر، شاملاً أي أرقام مكتوبة بخط اليد",
+  "raw_text": "النص الكامل من الصورة سطراً بسطر، شاملاً ما هو مكتوب بخط اليد",
+  "client_line": "<السطر الكامل الذي يبدأ بكلمة Client كما هو>" | null,
   "customer_name": "<اسم العميل>" | null,
-  "customer_phone": "<رقم الواتساب للعميل>" | null,
-  "invoice_number": "<رقم الفاتورة>" | null,
-  "handwritten_amount": "<الرقم المكتوب بخط اليد في أي مكان من الفاتورة>" | null,
+  "customer_phone": "<رقم الواتساب 8 أرقام يبدأ بـ 2 أو 3 أو 4>" | null,
+  "invoice_number": "<رقم الفاتورة الذي يأتي بعد /f>" | null,
+  "handwritten_amount": "<الرقم المكتوب بخط اليد بقلم أزرق في منتصف الفاتورة>" | null,
   "handwritten_confidence": "high" | "medium" | "low" | null,
-  "printed_total_max": "<أكبر رقم مطبوع تحت عمود Total أو Amount (AUM)>" | null
+  "printed_ttc": "<قيمة TTC المطبوعة في أسفل الفاتورة>" | null
 }
 
-قواعد لاستخراج بيانات العميل:
-1. ابحث عن السطر الذي يبدأ بكلمة "Client" (أو Client: أو العميل).
-2. اسم العميل = النص الموجود مباشرة بعد كلمة Client وقبل أول رقم في نفس السطر.
-3. رقم واتساب العميل = رقم موريتاني صالح مكوّن من 8 أرقام يبدأ بـ 2 أو 3 أو 4، موجود في نفس سطر Client فقط.
-4. ممنوع استخراج رقم العميل من أي سطر آخر.
-5. إذا لم يحتوِ سطر Client على رقم موريتاني صالح، اجعل customer_phone = null.
+== بنية سطر Client الثابتة ==
+السطر دائماً بهذا الشكل بالضبط:
+Client {رقم_حساب} {اسم_العميل} {رقم_واتساب} /f {رقم_فاتورة} {اسم_آخر}
 
-قواعد لاستخراج المبلغ (مهمة جداً):
-- handwritten_amount: ابحث في كامل الصورة عن أي رقم مكتوب بخط اليد (غالباً بقلم أزرق أو أسود)، سواء بجانب "To =" أو "TO =" أو "Total =" أو "TOTAL =" أو "T=" أو بدون أي علامة، في أعلى الفاتورة أو أسفلها أو على الجانب.
-- ادعم خط اليد بالقلم الأزرق وتجاهل الأختام والتواقيع والشعارات تماماً.
-- اقبل النقاط والفواصل والمسافات داخل الرقم وأعد الأرقام فقط بدون فواصل:
+أمثلة:
+- "Client 1042 محمد ولد أحمد 22334455 /f 2031 مؤسسة بناء"
+  → customer_name = "محمد ولد أحمد"
+  → customer_phone = "22334455"
+  → invoice_number = "2031"
+
+- "Client 305 الشيخ ولد محمدن 41221199 /f 1875 rimsoft"
+  → customer_name = "الشيخ ولد محمدن"
+  → customer_phone = "41221199"
+  → invoice_number = "1875"
+
+قواعد صارمة:
+1. رقم الحساب: أول رقم في السطر مباشرة بعد كلمة Client. ليس رقم الواتساب وليس رقم الفاتورة.
+2. اسم العميل: النص الذي يأتي بين رقم الحساب وبين رقم الواتساب (الذي يسبق /f مباشرة).
+3. رقم الواتساب: 8 أرقام بالضبط، يبدأ بـ 2 أو 3 أو 4، ويأتي مباشرة قبل "/f".
+4. رقم الفاتورة: الرقم الذي يأتي مباشرة بعد "/f".
+5. إذا لم يحتوِ سطر Client على رقم 8 خانات يسبق /f، اجعل customer_phone = null.
+6. ممنوع استخراج رقم الهاتف أو رقم الفاتورة من أي سطر آخر.
+
+== استخراج المبلغ ==
+- handwritten_amount: ابحث عن رقم مكتوب بخط اليد بقلم أزرق في منتصف الفاتورة، غالباً بصيغة "To =" أو "T=" أو "TO =" أو بدون أي علامة. أعد الأرقام فقط بدون فواصل ولا نقاط ولا مسافات.
   • "To = 822950" → "822950"
-  • "4.550.000" → "4550000"
+  • "T= 4.550.000" → "4550000"
   • "1 250 000" → "1250000"
-  • "Total = 75,000" → "75000"
-- إذا كان الرقم المكتوب بخط اليد غير واضح أو يحتمل أكثر من قراءة، اجعل handwritten_amount = null واجعل handwritten_confidence = "low".
-- إذا كان الرقم واضحاً تماماً اجعل handwritten_confidence = "high"، وإذا كان مقروءاً مع شك بسيط فاجعله "medium".
-- printed_total_max: أعد أكبر مبلغ مطبوع ظاهر في عمود Total أو Amount (AUM) داخل جدول الفاتورة كأرقام فقط بدون فواصل. إن لم يوجد، اجعله null.
-- raw_text يجب أن يحتوي على كل النصوص بما فيها المكتوبة بخط اليد.`;
+- إذا لم يوجد خط يد، اقرأ قيمة سطر TTC في أسفل الفاتورة وأعدها في printed_ttc.
+- handwritten_confidence: "high" إذا كان واضحاً، "medium" مع شك بسيط، "low" إذا غير واضح (وفي هذه الحالة اجعل handwritten_amount = null).
+- تجاهل الأختام والتواقيع والشعارات.`;
 
-// Mauritanian phone: 8 digits starting with 2, 3 or 4. Optional +222/222 prefix.
+// Pull the 8-digit Mauritanian whatsapp number that appears IMMEDIATELY before "/f"
+// inside the Client line. Falls back to any [234]\d{7} in that line if /f is missing.
 function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
   if (!rawText) return null;
   const lines = rawText.split(/\r?\n/);
   const clientLine = lines.find((l) => /^\s*(client|العميل)\b/i.test(l));
   if (!clientLine) return null;
-  const afterLabel = clientLine.replace(/^\s*(client\s*:?|العميل\s*:?)/i, " ");
-  const digits = afterLabel.replace(/[^\d+]/g, " ");
-  const re = /(?:\+?222)?\s*([234]\d{7})(?!\d)/g;
-  const m = re.exec(digits);
-  if (!m) return null;
-  return m[1];
+
+  // Preferred: digits right before "/f"
+  const beforeF = clientLine.match(/(\+?222)?\s*([234]\d{7})\s*\/\s*f\b/i);
+  if (beforeF) return beforeF[2];
+
+  // Fallback: last [234]\d{7} on the line (whatsapp is after the name, before /f)
+  const all = clientLine.match(/(?<!\d)([234]\d{7})(?!\d)/g);
+  if (all && all.length > 0) return all[all.length - 1];
+
+  return null;
 }
 
-// Parse an amount: strip dots, commas and spaces used as thousand separators,
-// keep digits only. "4.550.000" -> 4550000, "1 250 000" -> 1250000.
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
   const raw = String(v).trim();
@@ -70,8 +86,6 @@ function toNumber(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Deterministic re-scan of raw_text for handwritten amount markers anywhere in
-// the text. Accepts dots/commas/spaces as separators; returns digits only.
 function extractHandwrittenAmount(rawText: string): number | null {
   if (!rawText) return null;
   const re = /\b(?:to|total|t)\s*[=:]\s*([\d][\d.,\s]{2,30})/gi;
@@ -82,6 +96,27 @@ function extractHandwrittenAmount(rawText: string): number | null {
     if (n != null && (best == null || n > best)) best = n;
   }
   return best;
+}
+
+function extractTtc(rawText: string): number | null {
+  if (!rawText) return null;
+  const re = /\bttc\b[^\d]{0,10}([\d][\d.,\s]{2,30})/gi;
+  let best: number | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rawText)) !== null) {
+    const n = toNumber(m[1]);
+    if (n != null && (best == null || n > best)) best = n;
+  }
+  return best;
+}
+
+function extractInvoiceNumberFromClientLine(rawText: string): string | null {
+  if (!rawText) return null;
+  const lines = rawText.split(/\r?\n/);
+  const clientLine = lines.find((l) => /^\s*(client|العميل)\b/i.test(l));
+  if (!clientLine) return null;
+  const m = clientLine.match(/\/\s*f\s*(\d{1,8})/i);
+  return m ? m[1] : null;
 }
 
 export const extractInvoiceFields = createServerFn({ method: "POST" })
@@ -157,26 +192,29 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
     }
 
     const raw_text = (parsed.raw_text as string | undefined)?.toString() ?? "";
-    const phoneFromClientLine = extractMauritanianPhoneFromClientLine(raw_text);
+    const clientLineFromModel = (parsed.client_line as string | undefined)?.toString() ?? "";
+    const searchSource = clientLineFromModel
+      ? `Client ${clientLineFromModel}\n${raw_text}`
+      : raw_text;
 
+    const phoneFromClientLine = extractMauritanianPhoneFromClientLine(searchSource);
+    const invoiceFromClientLine = extractInvoiceNumberFromClientLine(searchSource);
 
-
-
-    // Amount extraction:
-    // 1) Prefer handwritten amount anywhere in the invoice (blue/black pen, etc.).
-    // 2) If model marks handwritten confidence as "low", discard it.
-    // 3) Otherwise fall back to deterministic re-scan, then to printed AUM total.
     const confidence = (parsed.handwritten_confidence as string | undefined)?.toLowerCase() ?? null;
     const handwrittenFromModel =
       confidence === "low" ? null : toNumber(parsed.handwritten_amount);
     const handwrittenFromText = extractHandwrittenAmount(raw_text);
     const handwritten = handwrittenFromModel ?? handwrittenFromText;
-    const printed = toNumber(parsed.printed_total_max);
-    const amount = handwritten ?? printed;
+    const ttcFromModel = toNumber(parsed.printed_ttc);
+    const ttcFromText = extractTtc(raw_text);
+    const ttc = ttcFromModel ?? ttcFromText;
+    const amount = handwritten ?? ttc;
+
     console.log("[extract-invoice] amount", {
       handwrittenFromModel,
       handwrittenFromText,
-      printed,
+      ttcFromModel,
+      ttcFromText,
       confidence,
       chosen: amount,
     });
@@ -184,9 +222,11 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
     return {
       customer_name: (parsed.customer_name as string | undefined)?.toString().trim() || null,
       customer_phone: phoneFromClientLine,
-      invoice_number: (parsed.invoice_number as string | undefined)?.toString().trim() || null,
+      invoice_number:
+        invoiceFromClientLine ||
+        (parsed.invoice_number as string | undefined)?.toString().trim() ||
+        null,
       amount,
       raw_text,
     };
   });
-
