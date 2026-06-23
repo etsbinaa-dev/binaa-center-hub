@@ -166,6 +166,30 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_balances: {
+        Row: {
+          created_at: string
+          initial_balance: number
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          initial_balance?: number
+          name?: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          initial_balance?: number
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
