@@ -178,8 +178,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
 
   const unsentInvoices = (unsentInvoicesList.data ?? []) as any[];
   const activeDeliveries = (activeDeliveriesList.data ?? []) as any[];
-  const overdueAccountsRaw = (overdueAccountsList.data ?? []) as any[];
-  const overdueAccounts = overdueAccountsRaw.filter((r: any) => r.status !== "paid");
+  const overdueAccounts = (overdueAccountsList.data ?? []) as any[];
   const tempPendingRows = (tempPendingList.data ?? []) as any[];
 
   const deliveryLines =
@@ -200,13 +199,13 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
   const overdueLines =
     overdueAccounts.length === 0
       ? ["—"]
-      : overdueAccounts.map((r) => {
-          const inv = r.invoice ?? {};
-          const total = Number(inv.amount_manual ?? inv.amount ?? r.amount ?? 0);
-          const paid = Number(inv.paid_amount ?? r.paid_amount ?? 0);
+      : overdueAccounts.map((inv: any) => {
+          const total = Number(inv.amount ?? 0);
+          const paid = Number(inv.paid_amount ?? 0);
           const remaining = Math.max(total - paid, 0);
           return `• ${inv.customer_name ?? "—"}: ${fmtMoney(remaining)}`;
         });
+
 
   const receptionLines =
     (receptionsToday.data ?? []).length === 0
