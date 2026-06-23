@@ -34,13 +34,13 @@ export const Route = createFileRoute("/settings")({
 
 type AppSettings = {
   org: { name: string; phone: string; address: string };
-  inventory: { criticalQuantity: number };
+  inventory: { criticalQuantity: number; lowStockThreshold: number };
   invoices: { whatsappMessage: string; showSmsMessage: boolean };
 };
 
 const defaults: AppSettings = {
   org: { name: "", phone: "", address: "" },
-  inventory: { criticalQuantity: 5 },
+  inventory: { criticalQuantity: 5, lowStockThreshold: 50 },
   invoices: {
     whatsappMessage:
       "مرحباً {{name}}، فاتورتكم رقم {{invoice}} من بِناء HUB جاهزة. شكراً لتعاملكم معنا.",
