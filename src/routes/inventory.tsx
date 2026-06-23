@@ -92,17 +92,23 @@ function QuantitiesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedLow, setSavedLow] = useState<Record<string, boolean>>({});
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
+  const [criticalThreshold, setCriticalThreshold] = useState<number>(DEFAULT_CRITICAL_THRESHOLD);
+  const [lowThreshold, setLowThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("app_settings")
-        .select("critical_quantity")
+        .select("critical_quantity, low_stock_threshold")
         .eq("id", 1)
         .maybeSingle();
-      if (data && typeof (data as any).critical_quantity === "number") {
-        setLowStockThreshold((data as any).critical_quantity);
+      if (data) {
+        if (typeof (data as any).critical_quantity === "number") {
+          setCriticalThreshold((data as any).critical_quantity);
+        }
+        if (typeof (data as any).low_stock_threshold === "number") {
+          setLowThreshold((data as any).low_stock_threshold);
+        }
       }
     })();
   }, []);
