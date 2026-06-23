@@ -129,7 +129,7 @@ function QuantitiesPage() {
               next[r.product_key] = r.quantity ?? 0;
               prevMap[r.product_key] = r.previous_quantity ?? 0;
               updMap[r.product_key] = r.updated_at;
-              low[r.product_key] = (r.quantity ?? 0) <= lowStockThreshold;
+              low[r.product_key] = (r.quantity ?? 0) <= criticalThreshold;
             }
           }
           return next;
