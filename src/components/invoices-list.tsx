@@ -240,7 +240,13 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     if (files.length === 0) return;
     setImporting(true);
     try {
-      const results = await Promise.all(files.map((f) => processOne(f)));
+      const CHUNK_SIZE = 4;
+      const results: Array<"ok" | "failed" | "missing"> = [];
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(chunk.map((f) => processOne(f)));
+        results.push(...chunkResults);
+      }
       const ok = results.filter((r) => r === "ok" || r === "missing").length;
       const failed = results.filter((r) => r === "failed").length;
       if (ok > 0) {
@@ -361,9 +367,8 @@ function InvoiceCard({
   const thumb = useSignedUrl(invoice.image_path);
 
   const phoneDigits = invoice.customer_phone.replace(/[^\d]/g, "");
-  const waLink = waMessage
-    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMessage)}`
-    : `https://wa.me/${phoneDigits}`;
+  const effectiveWaMessage = waMessage?.trim() || "مرحباً، فاتورتكم جاهزة.";
+  const waLink = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(effectiveWaMessage)}`;
 
 
   async function copyImage(): Promise<boolean> {
