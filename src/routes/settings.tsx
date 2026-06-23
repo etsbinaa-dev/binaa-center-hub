@@ -79,7 +79,7 @@ function SettingsPage() {
       const { data, error } = await supabase
         .from("app_settings")
         .select(
-          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, daily_report_time",
+          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, low_stock_threshold, daily_report_time",
         )
         .eq("id", 1)
         .maybeSingle();
@@ -97,6 +97,10 @@ function SettingsPage() {
               typeof row.critical_quantity === "number"
                 ? row.critical_quantity
                 : defaults.inventory.criticalQuantity,
+            lowStockThreshold:
+              typeof row.low_stock_threshold === "number"
+                ? row.low_stock_threshold
+                : defaults.inventory.lowStockThreshold,
           },
           invoices: {
             whatsappMessage: row.whatsapp_message ?? defaults.invoices.whatsappMessage,
