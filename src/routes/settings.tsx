@@ -427,8 +427,26 @@ function SettingsPage() {
               className={inputCls}
             />
           </Field>
+          <Field label="حد المخزون المنخفض (طن)">
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={settings.inventory.lowStockThreshold}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  inventory: {
+                    ...settings.inventory,
+                    lowStockThreshold: Number(e.target.value) || 0,
+                  },
+                })
+              }
+              className={inputCls}
+            />
+          </Field>
           <p className="text-xs text-muted-foreground">
-            ستُعرض المنتجات التي تساوي أو تقل عن هذا الحد كمخزون منخفض.
+            الحرج ≤ الكمية الحرجة 🔴، والمنخفض بين الحرج وحد المنخفض 🟠.
           </p>
           <SaveButton />
         </form>
