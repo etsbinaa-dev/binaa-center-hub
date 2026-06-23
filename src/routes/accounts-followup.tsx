@@ -522,199 +522,236 @@ function AccountsFollowupPage() {
           );
         })()}
 
-        {/* Major invoices list — split into outstanding and fully paid */}
+        {/* Major accounts — grouped by customer */}
         {(() => {
-          const outstanding = invoices.filter((i) => i.payment_status !== "paid");
-          const settled = invoices.filter((i) => i.payment_status === "paid");
+          type Group = {
+            key: string;
+            customer_name: string;
+            customer_phone: string;
+            invoices: Invoice[];
+            total: number;
+            paid: number;
+            remaining: number;
+            status: "paid" | "partial" | "unpaid";
+          };
 
-          const renderRow = (inv: Invoice) => {
-            try {
-              const history = remindersByInvoice[inv.id] ?? [];
-              const currentAmount = safeNum(inv.amount);
-              const paid = safeNum(inv.paid_amount);
-              const remaining = Math.max(0, currentAmount - paid);
-              const status = inv.payment_status;
-              const badge =
-                status === "paid"
-                  ? { cls: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200", dot: "🟢", text: "مدفوعة بالكامل" }
-                  : status === "partial"
-                    ? { cls: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200", dot: "🟠", text: "مدفوعة جزئياً" }
-                    : { cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", dot: "🟡", text: "غير مدفوعة" };
-              return (
-                <div key={inv.id} className="rounded-lg border p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold">{inv.customer_name || "—"}</div>
-                      <div className="text-xs text-muted-foreground" dir="ltr">
-                        {inv.customer_phone || "—"}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        فاتورة {inv.invoice_number || "—"} · {safeFormatDate(inv.created_at)}
-                      </div>
-                    </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge.cls}`}>
-                      <span className="ml-1">{badge.dot}</span>
-                      {badge.text}
-                    </span>
+          const groupsMap = new Map<string, Group>();
+          for (const inv of invoices) {
+            const key = (inv.customer_name || "—").trim() || "—";
+            let g = groupsMap.get(key);
+            if (!g) {
+              g = {
+                key,
+                customer_name: inv.customer_name || "—",
+                customer_phone: inv.customer_phone || "",
+                invoices: [],
+                total: 0,
+                paid: 0,
+                remaining: 0,
+                status: "paid",
+              };
+              groupsMap.set(key, g);
+            }
+            g.invoices.push(inv);
+            if (!g.customer_phone && inv.customer_phone) g.customer_phone = inv.customer_phone;
+          }
+          const groups: Group[] = [];
+          for (const g of groupsMap.values()) {
+            g.invoices.sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+            let total = 0,
+              paid = 0;
+            let allPaid = true,
+              anyPaid = false;
+            for (const inv of g.invoices) {
+              const amt = safeNum(inv.amount);
+              const p = safeNum(inv.paid_amount);
+              total += amt;
+              paid += Math.min(p, amt);
+              if (inv.payment_status !== "paid") allPaid = false;
+              if (inv.payment_status === "paid" || (p > 0 && p < amt)) anyPaid = true;
+            }
+            g.total = total;
+            g.paid = paid;
+            g.remaining = Math.max(0, total - paid);
+            g.status = allPaid ? "paid" : anyPaid ? "partial" : "unpaid";
+            groups.push(g);
+          }
+
+          const outstanding = groups.filter((g) => g.status !== "paid");
+          const settled = groups.filter((g) => g.status === "paid");
+
+          const statusBadge = (status: Group["status"]) =>
+            status === "paid"
+              ? { cls: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200", dot: "🟢", text: "مدفوع كلياً" }
+              : status === "partial"
+                ? { cls: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200", dot: "🟠", text: "مدفوع جزئياً" }
+                : { cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", dot: "🟡", text: "غير مدفوع" };
+
+          const renderInvoiceLine = (inv: Invoice) => {
+            const amt = safeNum(inv.amount);
+            const p = Math.min(safeNum(inv.paid_amount), amt);
+            const rem = Math.max(0, amt - p);
+            const b = statusBadge(
+              inv.payment_status === "paid" ? "paid" : p > 0 ? "partial" : "unpaid",
+            );
+            return (
+              <li key={inv.id} className="rounded-md border bg-muted/20 p-2 text-xs space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">فاتورة {inv.invoice_number || "—"}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${b.cls}`}>
+                    {b.dot} {b.text}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-center">
+                  <div>
+                    <div className="text-muted-foreground">المبلغ</div>
+                    <div className="font-bold">{amt.toLocaleString()}</div>
                   </div>
+                  <div>
+                    <div className="text-muted-foreground">المدفوع</div>
+                    <div className="font-bold text-green-700 dark:text-green-300">{p.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">المتبقي</div>
+                    <div className="font-bold text-amber-700 dark:text-amber-300">{rem.toLocaleString()}</div>
+                  </div>
+                </div>
+              </li>
+            );
+          };
 
-                  {/* Amount summary: original / paid / remaining */}
-                  <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-center text-xs">
-                    <div>
-                      <div className="text-muted-foreground">المبلغ الأصلي</div>
-                      <div className="font-bold">{currentAmount.toLocaleString()}</div>
+          const distributePayment = async (g: Group, amount: number) => {
+            let remaining = amount;
+            const unpaid = g.invoices
+              .filter((i) => i.payment_status !== "paid")
+              .slice()
+              .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+            for (const inv of unpaid) {
+              if (remaining <= 0) break;
+              const amt = safeNum(inv.amount);
+              if (amt <= 0) continue;
+              const invRem = Math.max(0, amt - Math.min(safeNum(inv.paid_amount), amt));
+              if (invRem <= 0) continue;
+              const apply = Math.min(remaining, invRem);
+              if (apply >= invRem) {
+                await applyPayment({ data: { invoice_id: inv.id, mode: "full" } });
+              } else {
+                await applyPayment({
+                  data: { invoice_id: inv.id, mode: "partial", amount: apply },
+                });
+              }
+              remaining -= apply;
+            }
+            return amount - remaining;
+          };
+
+          const renderGroup = (g: Group) => {
+            const b = statusBadge(g.status);
+            const phoneDigits = (g.customer_phone || "").replace(/[^\d]/g, "");
+            const lines = g.invoices
+              .filter((i) => i.payment_status !== "paid")
+              .map((i) => {
+                const amt = safeNum(i.amount);
+                const rem = Math.max(0, amt - Math.min(safeNum(i.paid_amount), amt));
+                return `• فاتورة ${i.invoice_number || "—"}: المتبقي ${rem.toLocaleString()}`;
+              })
+              .join("\n");
+            const waMsg =
+              g.status === "paid"
+                ? `مرحباً ${g.customer_name}، شكراً لتسديد كافة الفواتير.`
+                : `مرحباً ${g.customer_name}، تذكير بخصوص حسابكم:\nالإجمالي: ${g.total.toLocaleString()}\nالمدفوع: ${g.paid.toLocaleString()}\nالمتبقي: ${g.remaining.toLocaleString()}\n${lines}`;
+            const waLink = phoneDigits
+              ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMsg)}`
+              : null;
+
+            return (
+              <div key={g.key} className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-semibold">{g.customer_name}</div>
+                    <div className="text-xs text-muted-foreground" dir="ltr">
+                      {g.customer_phone || "—"}
                     </div>
-                    <div>
-                      <div className="text-muted-foreground">المدفوع</div>
-                      <div className="font-bold text-green-700 dark:text-green-300">{paid.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">المتبقي</div>
-                      <div className="font-bold text-amber-700 dark:text-amber-300">{remaining.toLocaleString()}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      عدد الفواتير: {g.invoices.length}
                     </div>
                   </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${b.cls}`}>
+                    <span className="ml-1">{b.dot}</span>
+                    {b.text}
+                  </span>
+                </div>
 
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 space-y-1">
-                      <Label className="text-xs">المبلغ الأصلي</Label>
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        value={amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount))}
-                        onChange={(e) =>
-                          setAmountDraft((d) => ({ ...d, [inv.id]: e.target.value }))
-                        }
-                      />
-                    </div>
+                <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-center text-xs">
+                  <div>
+                    <div className="text-muted-foreground">الإجمالي</div>
+                    <div className="font-bold">{g.total.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">المدفوع</div>
+                    <div className="font-bold text-green-700 dark:text-green-300">{g.paid.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">المتبقي</div>
+                    <div className="font-bold text-amber-700 dark:text-amber-300">{g.remaining.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {g.status !== "paid" && (
                     <Button
                       size="sm"
-                      variant="outline"
                       onClick={async () => {
-                        const raw = amountDraft[inv.id] ?? (inv.amount == null ? "" : String(currentAmount));
-                        const num = raw === "" ? null : Number(raw);
-                        if (num !== null && (!Number.isFinite(num) || num < 0)) {
+                        if (g.remaining <= 0) {
+                          toast.error("لا يوجد متبقي");
+                          return;
+                        }
+                        const input = window.prompt(
+                          `كم تم دفعه الآن؟ (المتبقي الكلي ${g.remaining.toLocaleString()})`,
+                        );
+                        if (input == null) return;
+                        const add = Number(input);
+                        if (!Number.isFinite(add) || add <= 0) {
                           toast.error("مبلغ غير صالح");
                           return;
                         }
-                        await saveAmount({ data: { invoice_id: inv.id, amount: num } });
-                        toast.success("تم حفظ المبلغ");
-                        reload();
+                        try {
+                          const applied = await distributePayment(g, add);
+                          toast.success(`تم تسجيل دفعة بقيمة ${applied.toLocaleString()}`);
+                          reload();
+                        } catch (e) {
+                          toast.error((e as Error)?.message ?? "تعذر تسجيل الدفعة");
+                        }
                       }}
                     >
-                      حفظ
+                      تسجيل دفعة
                     </Button>
-                  </div>
-
-                  {status !== "paid" && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          if (!Number.isFinite(currentAmount) || currentAmount <= 0) {
-                            toast.error("حدد المبلغ الأصلي أولاً");
-                            return;
-                          }
-                          const input = window.prompt(
-                            `كم تم دفعه الآن؟ (المتبقي ${remaining.toLocaleString()})`,
-                          );
-                          if (input == null) return;
-                          const add = Number(input);
-                          if (!Number.isFinite(add) || add <= 0) {
-                            toast.error("مبلغ غير صالح");
-                            return;
-                          }
-                          try {
-                            await applyPayment({
-                              data: { invoice_id: inv.id, mode: "partial", amount: add },
-                            });
-                            toast.success("تم تسجيل الدفعة الجزئية");
-                            reload();
-                          } catch (e) {
-                            toast.error((e as Error)?.message ?? "تعذر تسجيل الدفعة");
-                          }
-                        }}
-                      >
-                        دفع جزئي
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={async () => {
-                          if (!Number.isFinite(currentAmount) || currentAmount <= 0) {
-                            toast.error("حدد المبلغ الأصلي أولاً");
-                            return;
-                          }
-                          if (!window.confirm("تأكيد تسجيل الفاتورة كمدفوعة بالكامل؟")) return;
-                          try {
-                            await applyPayment({
-                              data: { invoice_id: inv.id, mode: "full" },
-                            });
-                            toast.success("تم تسديد الفاتورة بالكامل");
-                            reload();
-                          } catch (e) {
-                            toast.error((e as Error)?.message ?? "تعذر تسجيل الدفعة");
-                          }
-                        }}
-                      >
-                        دفع كامل
-                      </Button>
-                    </div>
                   )}
-
-                  {history.length > 0 && (
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground">
-                        سجل التذكيرات ({history.length})
-                      </summary>
-                      <ul className="mt-2 space-y-1">
-                        {history.map((h) => {
-                          try {
-                            return (
-                              <li key={h.id} className="rounded border bg-muted/30 p-2">
-                                <div className="font-mono text-[10px] text-muted-foreground">
-                                  {safeFormatDateTime(h.created_at)}
-                                </div>
-                                <div>
-                                  الحالة:{" "}
-                                  {h.status === "paid"
-                                    ? "مدفوعة"
-                                    : h.status === "not_paid"
-                                      ? "غير مدفوعة"
-                                      : h.status === "snoozed"
-                                        ? "ذكّرني لاحقاً"
-                                        : "بانتظار الرد"}
-                                </div>
-                                {h.next_remind_at && (
-                                  <div className="text-muted-foreground">
-                                    التذكير التالي: {safeFormatDateTime(h.next_remind_at)}
-                                  </div>
-                                )}
-                              </li>
-                            );
-                          } catch (err) {
-                            console.error("[followup] failed to render reminder history row", h, err);
-                            return null;
-                          }
-                        })}
-                      </ul>
-                    </details>
+                  {waLink && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+                    >
+                      <Send className="h-4 w-4 ml-1" /> واتساب
+                    </Button>
                   )}
                 </div>
-              );
-            } catch (err) {
-              logFollowupError("render-invoice-row", err, {
-                invoice_id: inv?.id,
-                invoice: inv,
-                field: "invoice-row",
-              });
-              return null;
-            }
+
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    تفاصيل الفواتير ({g.invoices.length})
+                  </summary>
+                  <ul className="mt-2 space-y-2">{g.invoices.map(renderInvoiceLine)}</ul>
+                </details>
+              </div>
+            );
           };
 
           return (
             <>
               <Card className="p-4 space-y-3">
-                <h2 className="text-base font-bold">الحسابات الكبيرة</h2>
+                <h2 className="text-base font-bold">الحسابات الكلية</h2>
                 {loading ? (
                   <div className="flex items-center justify-center py-10 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -724,7 +761,7 @@ function AccountsFollowupPage() {
                     لا توجد حسابات قائمة حالياً.
                   </div>
                 ) : (
-                  <div className="space-y-3">{outstanding.map(renderRow)}</div>
+                  <div className="space-y-3">{outstanding.map(renderGroup)}</div>
                 )}
               </Card>
 
@@ -734,7 +771,7 @@ function AccountsFollowupPage() {
                     <summary className="cursor-pointer text-base font-bold">
                       الحسابات المسددة ({settled.length})
                     </summary>
-                    <div className="mt-3 space-y-3">{settled.map(renderRow)}</div>
+                    <div className="mt-3 space-y-3">{settled.map(renderGroup)}</div>
                   </details>
                 </Card>
               )}
