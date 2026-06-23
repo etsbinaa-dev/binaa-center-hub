@@ -163,7 +163,10 @@ function SettingsPage() {
   const saveInventory = async (e: React.FormEvent) => {
     e.preventDefault();
     await persistRemote(
-      { critical_quantity: settings.inventory.criticalQuantity },
+      {
+        critical_quantity: settings.inventory.criticalQuantity,
+        low_stock_threshold: settings.inventory.lowStockThreshold,
+      },
       "تم حفظ إعدادات المخزون",
     );
   };
