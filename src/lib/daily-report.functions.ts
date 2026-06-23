@@ -147,8 +147,10 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       .neq("status", "done")
       .order("created_at", { ascending: false }),
     supabaseAdmin
-      .from("account_reminders")
-      .select("amount, paid_amount, status, invoice:invoices(customer_name, amount, amount_manual, paid_amount)"),
+      .from("invoices")
+      .select("customer_name, amount, amount_manual, paid_amount")
+      .eq("payment_status", "unpaid"),
+
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
 
