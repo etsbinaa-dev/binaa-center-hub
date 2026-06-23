@@ -149,23 +149,37 @@ function QuantitiesPage() {
 
   const save = async () => {
     setSaving(true);
-    // snapshot: read current saved quantities to use as previous_quantity
+    // snapshot: read current saved quantities + previous_quantity from DB
     const { data: current } = await supabase
       .from("quantities")
-      .select("product_key, quantity");
-    const prevSnapshot: Record<string, number> = {};
-    for (const r of (current ?? []) as Array<{ product_key: string; quantity: number | null }>) {
-      prevSnapshot[r.product_key] = r.quantity ?? 0;
+      .select("product_key, quantity, previous_quantity");
+    const currentQty: Record<string, number> = {};
+    const currentPrev: Record<string, number> = {};
+    for (const r of (current ?? []) as Array<{
+      product_key: string;
+      quantity: number | null;
+      previous_quantity: number | null;
+    }>) {
+      currentQty[r.product_key] = r.quantity ?? 0;
+      currentPrev[r.product_key] = r.previous_quantity ?? 0;
     }
+    const nextPrev: Record<string, number> = {};
     const rows = SECTIONS.flatMap((s) =>
-      s.items.map((p) => ({
-        product_key: p.key,
-        label: p.label,
-        category: s.category,
-        quantity: values[p.key],
-        previous_quantity: prevSnapshot[p.key] ?? 0,
-        min_quantity: 50,
-      })),
+      s.items.map((p) => {
+        const newQty = values[p.key];
+        const dbQty = currentQty[p.key] ?? 0;
+        // only update previous_quantity when the new quantity differs from the saved one
+        const prev = newQty !== dbQty ? dbQty : (currentPrev[p.key] ?? 0);
+        nextPrev[p.key] = prev;
+        return {
+          product_key: p.key,
+          label: p.label,
+          category: s.category,
+          quantity: newQty,
+          previous_quantity: prev,
+          min_quantity: lowThreshold,
+        };
+      }),
     );
     const { error } = await supabase.from("quantities").upsert(rows, { onConflict: "product_key" });
     setSaving(false);
@@ -173,7 +187,7 @@ function QuantitiesPage() {
     else {
       toast.success("تم حفظ الكميات بنجاح");
       logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
-      setPrevious(prevSnapshot);
+      setPrevious(nextPrev);
       const nowIso = new Date().toISOString();
       setUpdatedAt((u) => {
         const next = { ...u };
@@ -184,7 +198,7 @@ function QuantitiesPage() {
       const nextLow: Record<string, boolean> = {};
       for (const s of SECTIONS) {
         for (const p of s.items) {
-          const isLow = values[p.key] <= lowStockThreshold;
+          const isLow = values[p.key] <= criticalThreshold;
           nextLow[p.key] = isLow;
           if (isLow && !savedLow[p.key]) newlyLow.push(p);
         }
