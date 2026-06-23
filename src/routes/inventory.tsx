@@ -287,7 +287,7 @@ function QuantitiesPage() {
                       const qa = values[a.key] ?? 0;
                       const qb = values[b.key] ?? 0;
                       const tier = (q: number) =>
-                        q <= lowStockThreshold ? 0 : q <= 50 ? 1 : 2;
+                        q <= criticalThreshold ? 0 : q <= lowThreshold ? 1 : 2;
                       const ta = tier(qa);
                       const tb = tier(qb);
                       if (ta !== tb) return ta - tb;
@@ -295,8 +295,8 @@ function QuantitiesPage() {
                     })
                     .map((p) => {
                     const qty = values[p.key];
-                    const critical = qty <= lowStockThreshold;
-                    const low = !critical && qty <= 50;
+                    const critical = qty <= criticalThreshold;
+                    const low = !critical && qty <= lowThreshold;
                     const tone = critical
                       ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
                       : low
