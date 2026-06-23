@@ -280,7 +280,7 @@ function QuantitiesPage() {
                   }`}
                 />
               </button>
-              {open[s.category] && (
+              {(open[s.category] ?? criticalOnly) && (
                 <div className="space-y-3 border-t border-border bg-muted/20 p-3 sm:p-4">
                   {[...s.items]
                     .sort((a, b) => {
