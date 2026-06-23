@@ -341,6 +341,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
 
 function InvoiceCard({
   invoice,
+  waMessage,
   onView,
   onEdit,
   onMarkSent,
@@ -349,6 +350,7 @@ function InvoiceCard({
   canDelete,
 }: {
   invoice: Invoice;
+  waMessage: string;
   onView: () => void;
   onEdit: () => void;
   onMarkSent: () => void;
@@ -359,7 +361,10 @@ function InvoiceCard({
   const thumb = useSignedUrl(invoice.image_path);
 
   const phoneDigits = invoice.customer_phone.replace(/[^\d]/g, "");
-  const waLink = `https://wa.me/${phoneDigits}`;
+  const waLink = waMessage
+    ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMessage)}`
+    : `https://wa.me/${phoneDigits}`;
+
 
   async function copyImage(): Promise<boolean> {
     if (!invoice.image_path) return false;
