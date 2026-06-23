@@ -3,7 +3,32 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sendTelegram } from "@/lib/telegram-alert.functions";
 
-// Helpers
+// ---------- Types ----------
+export type ClientInvoice = {
+  id: string;
+  invoice_number: string;
+  amount: number;
+  paid_amount: number;
+  remaining: number;
+  payment_status: "unpaid" | "partial" | "paid";
+  sent_at: string | null;
+  last_reminder_at: string | null;
+  is_overdue: boolean;
+};
+
+export type ClientGroup = {
+  phone: string;
+  name: string;
+  initial_balance: number;
+  invoices_total: number;
+  total_paid: number;
+  current_balance: number;
+  invoices: ClientInvoice[];
+  has_overdue: boolean;
+  oldest_unpaid_sent_at: string | null;
+};
+
+// ---------- Helpers ----------
 async function ensureAdmin(ctx: { supabase: any; userId: string }) {
   const { data, error } = await ctx.supabase.rpc("has_role", {
     _user_id: ctx.userId,
@@ -32,19 +57,25 @@ async function isKindEnabled(supabaseAdmin: any, kind: string): Promise<boolean>
       .select("enabled")
       .eq("kind", kind)
       .maybeSingle();
-    if (error) {
-      console.error("[followup:settings]", error);
-      return true;
-    }
+    if (error) return true;
     if (!data) return true;
     return data.enabled !== false;
-  } catch (e) {
-    console.error("[followup:settings]", e);
+  } catch {
     return true;
   }
 }
 
-// --- Invoice amount ---
+function normalisePhone(p: string | null | undefined): string {
+  return (p || "").replace(/[^\d]/g, "");
+}
+
+function num(v: unknown): number {
+  if (v == null) return 0;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ---------- Invoice amount ----------
 export const setInvoiceAmount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -65,7 +96,7 @@ export const setInvoiceAmount = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// --- Apply payment (partial or full) ---
+// ---------- Apply payment ----------
 export const applyInvoicePayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -114,31 +145,159 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
   });
 
-// --- Listing: grouped by customer_phone ---
+// ---------- Upsert customer balance ----------
+export const upsertCustomerBalance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        phone: z.string().min(1),
+        name: z.string().optional().default(""),
+        initial_balance: z.number().nonnegative(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const phone = normalisePhone(data.phone);
+    if (!phone) throw new Error("رقم غير صالح");
+    const { error } = await context.supabase
+      .from("customer_balances")
+      .upsert(
+        {
+          phone,
+          name: data.name ?? "",
+          initial_balance: data.initial_balance,
+        },
+        { onConflict: "phone" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- Listing: grouped by customer_phone with balances ----------
 export const listFollowupGroups = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureAdmin(context);
+
     const { data: invoices, error } = await context.supabase
       .from("invoices")
       .select(
-        "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, paid_at, last_reminder_at, created_at, sent_at, status",
+        "id, customer_name, customer_phone, invoice_number, amount, paid_amount, payment_status, last_reminder_at, created_at, sent_at, status",
       )
       .eq("status", "sent")
       .neq("payment_status", "paid")
       .order("sent_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { invoices: invoices ?? [] };
+
+    const { data: balances, error: be } = await context.supabase
+      .from("customer_balances")
+      .select("phone, name, initial_balance");
+    if (be) throw new Error(be.message);
+
+    const balanceMap = new Map<string, { name: string; initial_balance: number }>();
+    for (const b of balances ?? []) {
+      balanceMap.set(normalisePhone((b as any).phone), {
+        name: (b as any).name ?? "",
+        initial_balance: num((b as any).initial_balance),
+      });
+    }
+
+    const now = Date.now();
+    const groupMap = new Map<string, ClientGroup>();
+
+    for (const raw of invoices ?? []) {
+      const inv = raw as any;
+      const phone = normalisePhone(inv.customer_phone);
+      if (!phone) continue;
+      let g = groupMap.get(phone);
+      if (!g) {
+        const bal = balanceMap.get(phone);
+        g = {
+          phone,
+          name: bal?.name || inv.customer_name || "",
+          initial_balance: bal?.initial_balance ?? 0,
+          invoices_total: 0,
+          total_paid: 0,
+          current_balance: 0,
+          invoices: [],
+          has_overdue: false,
+          oldest_unpaid_sent_at: null,
+        };
+        groupMap.set(phone, g);
+      }
+      if (!g.name && inv.customer_name) g.name = inv.customer_name;
+
+      const amount = num(inv.amount);
+      const paid = Math.min(num(inv.paid_amount), amount);
+      const remaining = Math.max(0, amount - paid);
+      const sentAt: string | null = inv.sent_at ?? null;
+      const isOverdue =
+        sentAt != null &&
+        inv.payment_status !== "paid" &&
+        now - new Date(sentAt).getTime() >= 86400000;
+
+      const ci: ClientInvoice = {
+        id: inv.id,
+        invoice_number: String(inv.invoice_number ?? ""),
+        amount,
+        paid_amount: paid,
+        remaining,
+        payment_status: (inv.payment_status ?? "unpaid") as ClientInvoice["payment_status"],
+        sent_at: sentAt,
+        last_reminder_at: inv.last_reminder_at ?? null,
+        is_overdue: isOverdue,
+      };
+      g.invoices.push(ci);
+      g.invoices_total += amount;
+      g.total_paid += paid;
+      if (isOverdue) g.has_overdue = true;
+      if (sentAt && (!g.oldest_unpaid_sent_at || sentAt < g.oldest_unpaid_sent_at)) {
+        g.oldest_unpaid_sent_at = sentAt;
+      }
+    }
+
+    // Also include customers with only initial_balance (no invoices) — optional
+    for (const [phone, bal] of balanceMap.entries()) {
+      if (groupMap.has(phone)) continue;
+      if ((bal.initial_balance ?? 0) <= 0) continue;
+      groupMap.set(phone, {
+        phone,
+        name: bal.name,
+        initial_balance: bal.initial_balance,
+        invoices_total: 0,
+        total_paid: 0,
+        current_balance: bal.initial_balance,
+        invoices: [],
+        has_overdue: false,
+        oldest_unpaid_sent_at: null,
+      });
+    }
+
+    const groups: ClientGroup[] = [];
+    for (const g of groupMap.values()) {
+      g.current_balance = Math.max(0, g.initial_balance + g.invoices_total - g.total_paid);
+      g.invoices.sort((a, b) =>
+        (a.sent_at || "").localeCompare(b.sent_at || ""),
+      );
+      groups.push(g);
+    }
+    groups.sort((a, b) => {
+      if (a.has_overdue !== b.has_overdue) return a.has_overdue ? -1 : 1;
+      return b.current_balance - a.current_balance;
+    });
+
+    return { groups };
   });
 
-// --- Scan & dispatch (reminders after 1 day, max 1 telegram per day per invoice) ---
+// ---------- Scan & dispatch ----------
 export async function runFollowupScan(supabaseAdmin: any) {
   const now = new Date();
   const nowIso = now.toISOString();
-  const cutoff = new Date(now.getTime() - 1 * 86400000).toISOString();
+  const cutoff = new Date(now.getTime() - 86400000).toISOString();
   const oneDayAgo = cutoff;
 
-  // SENT, unpaid invoices, sent at least 1 day ago
   const { data: invoices } = await supabaseAdmin
     .from("invoices")
     .select(
@@ -151,7 +310,6 @@ export async function runFollowupScan(supabaseAdmin: any) {
 
   let sent = 0;
   for (const inv of invoices ?? []) {
-    // skip if a telegram reminder was sent within last 24h
     if (inv.last_reminder_at && inv.last_reminder_at > oneDayAgo) continue;
 
     const amt = Number(inv.amount ?? 0);
@@ -178,7 +336,6 @@ export async function runFollowupScan(supabaseAdmin: any) {
     const tg = enabled
       ? await sendTelegram(tgText)
       : { ok: false, sent: 0, errors: ["disabled"] };
-    if (!enabled) console.info("[followup] telegram skipped (disabled): debt_reminder");
 
     if (tg.ok) {
       await supabaseAdmin
