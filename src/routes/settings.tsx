@@ -242,6 +242,7 @@ function SettingsPage() {
               org_phone: next.org.phone,
               org_address: next.org.address,
               critical_quantity: next.inventory.criticalQuantity,
+              low_stock_threshold: next.inventory.lowStockThreshold,
               whatsapp_message: next.invoices.whatsappMessage,
               show_sms_message: next.invoices.showSmsMessage,
             },
