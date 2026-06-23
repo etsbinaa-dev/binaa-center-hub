@@ -219,10 +219,24 @@ function QuantitiesPage() {
   };
 
   const displayedSections = criticalOnly
-    ? SECTIONS.map((s) => ({
-        ...s,
-        items: s.items.filter((p) => (values[p.key] ?? 0) <= 50),
-      })).filter((s) => s.items.length > 0)
+    ? (() => {
+        const flat = SECTIONS.flatMap((s) =>
+          s.items
+            .filter((p) => (values[p.key] ?? 0) <= lowThreshold)
+            .map((p) => ({ ...p, category: s.category })),
+        );
+        flat.sort((a, b) => {
+          const qa = values[a.key] ?? 0;
+          const qb = values[b.key] ?? 0;
+          const ta = qa <= criticalThreshold ? 0 : 1;
+          const tb = qb <= criticalThreshold ? 0 : 1;
+          if (ta !== tb) return ta - tb;
+          return qa - qb;
+        });
+        return flat.length
+          ? [{ category: "critical-low", title: "المخزون الحرج والمنخفض", items: flat }]
+          : [];
+      })()
     : SECTIONS;
 
   return (
