@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
 
-const DEFAULT_LOW_STOCK_THRESHOLD = 5;
+const DEFAULT_CRITICAL_THRESHOLD = 5;
+const DEFAULT_LOW_STOCK_THRESHOLD = 50;
 
 type Product = { key: string; label: string };
 type Section = { category: string; title: string; items: Product[] };
@@ -91,17 +92,23 @@ function QuantitiesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedLow, setSavedLow] = useState<Record<string, boolean>>({});
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
+  const [criticalThreshold, setCriticalThreshold] = useState<number>(DEFAULT_CRITICAL_THRESHOLD);
+  const [lowThreshold, setLowThreshold] = useState<number>(DEFAULT_LOW_STOCK_THRESHOLD);
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("app_settings")
-        .select("critical_quantity")
+        .select("critical_quantity, low_stock_threshold")
         .eq("id", 1)
         .maybeSingle();
-      if (data && typeof (data as any).critical_quantity === "number") {
-        setLowStockThreshold((data as any).critical_quantity);
+      if (data) {
+        if (typeof (data as any).critical_quantity === "number") {
+          setCriticalThreshold((data as any).critical_quantity);
+        }
+        if (typeof (data as any).low_stock_threshold === "number") {
+          setLowThreshold((data as any).low_stock_threshold);
+        }
       }
     })();
   }, []);
@@ -122,7 +129,7 @@ function QuantitiesPage() {
               next[r.product_key] = r.quantity ?? 0;
               prevMap[r.product_key] = r.previous_quantity ?? 0;
               updMap[r.product_key] = r.updated_at;
-              low[r.product_key] = (r.quantity ?? 0) <= lowStockThreshold;
+              low[r.product_key] = (r.quantity ?? 0) <= criticalThreshold;
             }
           }
           return next;
@@ -142,23 +149,37 @@ function QuantitiesPage() {
 
   const save = async () => {
     setSaving(true);
-    // snapshot: read current saved quantities to use as previous_quantity
+    // snapshot: read current saved quantities + previous_quantity from DB
     const { data: current } = await supabase
       .from("quantities")
-      .select("product_key, quantity");
-    const prevSnapshot: Record<string, number> = {};
-    for (const r of (current ?? []) as Array<{ product_key: string; quantity: number | null }>) {
-      prevSnapshot[r.product_key] = r.quantity ?? 0;
+      .select("product_key, quantity, previous_quantity");
+    const currentQty: Record<string, number> = {};
+    const currentPrev: Record<string, number> = {};
+    for (const r of (current ?? []) as Array<{
+      product_key: string;
+      quantity: number | null;
+      previous_quantity: number | null;
+    }>) {
+      currentQty[r.product_key] = r.quantity ?? 0;
+      currentPrev[r.product_key] = r.previous_quantity ?? 0;
     }
+    const nextPrev: Record<string, number> = {};
     const rows = SECTIONS.flatMap((s) =>
-      s.items.map((p) => ({
-        product_key: p.key,
-        label: p.label,
-        category: s.category,
-        quantity: values[p.key],
-        previous_quantity: prevSnapshot[p.key] ?? 0,
-        min_quantity: 50,
-      })),
+      s.items.map((p) => {
+        const newQty = values[p.key];
+        const dbQty = currentQty[p.key] ?? 0;
+        // only update previous_quantity when the new quantity differs from the saved one
+        const prev = newQty !== dbQty ? dbQty : (currentPrev[p.key] ?? 0);
+        nextPrev[p.key] = prev;
+        return {
+          product_key: p.key,
+          label: p.label,
+          category: s.category,
+          quantity: newQty,
+          previous_quantity: prev,
+          min_quantity: lowThreshold,
+        };
+      }),
     );
     const { error } = await supabase.from("quantities").upsert(rows, { onConflict: "product_key" });
     setSaving(false);
@@ -166,7 +187,7 @@ function QuantitiesPage() {
     else {
       toast.success("تم حفظ الكميات بنجاح");
       logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
-      setPrevious(prevSnapshot);
+      setPrevious(nextPrev);
       const nowIso = new Date().toISOString();
       setUpdatedAt((u) => {
         const next = { ...u };
@@ -177,7 +198,7 @@ function QuantitiesPage() {
       const nextLow: Record<string, boolean> = {};
       for (const s of SECTIONS) {
         for (const p of s.items) {
-          const isLow = values[p.key] <= lowStockThreshold;
+          const isLow = values[p.key] <= criticalThreshold;
           nextLow[p.key] = isLow;
           if (isLow && !savedLow[p.key]) newlyLow.push(p);
         }
@@ -198,10 +219,24 @@ function QuantitiesPage() {
   };
 
   const displayedSections = criticalOnly
-    ? SECTIONS.map((s) => ({
-        ...s,
-        items: s.items.filter((p) => (values[p.key] ?? 0) <= 50),
-      })).filter((s) => s.items.length > 0)
+    ? (() => {
+        const flat = SECTIONS.flatMap((s) =>
+          s.items
+            .filter((p) => (values[p.key] ?? 0) <= lowThreshold)
+            .map((p) => ({ ...p, category: s.category })),
+        );
+        flat.sort((a, b) => {
+          const qa = values[a.key] ?? 0;
+          const qb = values[b.key] ?? 0;
+          const ta = qa <= criticalThreshold ? 0 : 1;
+          const tb = qb <= criticalThreshold ? 0 : 1;
+          if (ta !== tb) return ta - tb;
+          return qa - qb;
+        });
+        return flat.length
+          ? [{ category: "critical-low", title: "المخزون الحرج والمنخفض", items: flat }]
+          : [];
+      })()
     : SECTIONS;
 
   return (
@@ -245,14 +280,14 @@ function QuantitiesPage() {
                   }`}
                 />
               </button>
-              {open[s.category] && (
+              {(open[s.category] ?? criticalOnly) && (
                 <div className="space-y-3 border-t border-border bg-muted/20 p-3 sm:p-4">
                   {[...s.items]
                     .sort((a, b) => {
                       const qa = values[a.key] ?? 0;
                       const qb = values[b.key] ?? 0;
                       const tier = (q: number) =>
-                        q <= lowStockThreshold ? 0 : q <= 50 ? 1 : 2;
+                        q <= criticalThreshold ? 0 : q <= lowThreshold ? 1 : 2;
                       const ta = tier(qa);
                       const tb = tier(qb);
                       if (ta !== tb) return ta - tb;
@@ -260,8 +295,8 @@ function QuantitiesPage() {
                     })
                     .map((p) => {
                     const qty = values[p.key];
-                    const critical = qty <= lowStockThreshold;
-                    const low = !critical && qty <= 50;
+                    const critical = qty <= criticalThreshold;
+                    const low = !critical && qty <= lowThreshold;
                     const tone = critical
                       ? "border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-950"
                       : low

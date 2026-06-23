@@ -34,13 +34,13 @@ export const Route = createFileRoute("/settings")({
 
 type AppSettings = {
   org: { name: string; phone: string; address: string };
-  inventory: { criticalQuantity: number };
+  inventory: { criticalQuantity: number; lowStockThreshold: number };
   invoices: { whatsappMessage: string; showSmsMessage: boolean };
 };
 
 const defaults: AppSettings = {
   org: { name: "", phone: "", address: "" },
-  inventory: { criticalQuantity: 5 },
+  inventory: { criticalQuantity: 5, lowStockThreshold: 50 },
   invoices: {
     whatsappMessage:
       "مرحباً {{name}}، فاتورتكم رقم {{invoice}} من بِناء HUB جاهزة. شكراً لتعاملكم معنا.",
@@ -79,7 +79,7 @@ function SettingsPage() {
       const { data, error } = await supabase
         .from("app_settings")
         .select(
-          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, daily_report_time",
+          "org_name, org_phone, org_address, whatsapp_message, show_sms_message, critical_quantity, low_stock_threshold, daily_report_time",
         )
         .eq("id", 1)
         .maybeSingle();
@@ -97,6 +97,10 @@ function SettingsPage() {
               typeof row.critical_quantity === "number"
                 ? row.critical_quantity
                 : defaults.inventory.criticalQuantity,
+            lowStockThreshold:
+              typeof row.low_stock_threshold === "number"
+                ? row.low_stock_threshold
+                : defaults.inventory.lowStockThreshold,
           },
           invoices: {
             whatsappMessage: row.whatsapp_message ?? defaults.invoices.whatsappMessage,
@@ -159,7 +163,10 @@ function SettingsPage() {
   const saveInventory = async (e: React.FormEvent) => {
     e.preventDefault();
     await persistRemote(
-      { critical_quantity: settings.inventory.criticalQuantity },
+      {
+        critical_quantity: settings.inventory.criticalQuantity,
+        low_stock_threshold: settings.inventory.lowStockThreshold,
+      },
       "تم حفظ إعدادات المخزون",
     );
   };
@@ -235,6 +242,7 @@ function SettingsPage() {
               org_phone: next.org.phone,
               org_address: next.org.address,
               critical_quantity: next.inventory.criticalQuantity,
+              low_stock_threshold: next.inventory.lowStockThreshold,
               whatsapp_message: next.invoices.whatsappMessage,
               show_sms_message: next.invoices.showSmsMessage,
             },
@@ -419,8 +427,26 @@ function SettingsPage() {
               className={inputCls}
             />
           </Field>
+          <Field label="حد المخزون المنخفض (طن)">
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={settings.inventory.lowStockThreshold}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  inventory: {
+                    ...settings.inventory,
+                    lowStockThreshold: Number(e.target.value) || 0,
+                  },
+                })
+              }
+              className={inputCls}
+            />
+          </Field>
           <p className="text-xs text-muted-foreground">
-            ستُعرض المنتجات التي تساوي أو تقل عن هذا الحد كمخزون منخفض.
+            الحرج ≤ الكمية الحرجة 🔴، والمنخفض بين الحرج وحد المنخفض 🟠.
           </p>
           <SaveButton />
         </form>

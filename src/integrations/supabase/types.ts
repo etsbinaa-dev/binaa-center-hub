@@ -130,6 +130,7 @@ export type Database = {
           daily_report_last_sent_date: string | null
           daily_report_time: string
           id: number
+          low_stock_threshold: number
           org_address: string
           org_name: string
           org_phone: string
@@ -142,6 +143,7 @@ export type Database = {
           daily_report_last_sent_date?: string | null
           daily_report_time?: string
           id?: number
+          low_stock_threshold?: number
           org_address?: string
           org_name?: string
           org_phone?: string
@@ -154,6 +156,7 @@ export type Database = {
           daily_report_last_sent_date?: string | null
           daily_report_time?: string
           id?: number
+          low_stock_threshold?: number
           org_address?: string
           org_name?: string
           org_phone?: string
