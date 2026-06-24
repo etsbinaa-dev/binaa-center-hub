@@ -169,21 +169,21 @@ export type Database = {
       customer_balances: {
         Row: {
           created_at: string
-          initial_balance: number
+          current_balance: number
           name: string
           phone: string
           updated_at: string
         }
         Insert: {
           created_at?: string
-          initial_balance?: number
+          current_balance?: number
           name?: string
           phone: string
           updated_at?: string
         }
         Update: {
           created_at?: string
-          initial_balance?: number
+          current_balance?: number
           name?: string
           phone?: string
           updated_at?: string
