@@ -125,8 +125,39 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
         .update({ status: "sent", sent_at: new Date().toISOString() })
         .eq("id", inv.id);
       if (error) throw error;
+
+      // أضف مبلغ الفاتورة إلى رصيد العميل في customer_balances
+      const { data: invData } = await supabase
+        .from("invoices")
+        .select("customer_phone, customer_name, amount")
+        .eq("id", inv.id)
+        .maybeSingle();
+
+      if (invData?.customer_phone && invData?.amount) {
+        const phone = invData.customer_phone.trim();
+        const amount = Number(invData.amount ?? 0);
+
+        const { data: bal } = await supabase
+          .from("customer_balances")
+          .select("current_balance")
+          .eq("phone", phone)
+          .maybeSingle();
+
+        const currentBalance = Number((bal as any)?.current_balance ?? 0);
+
+        await supabase
+          .from("customer_balances")
+          .upsert({
+            phone,
+            name: (invData.customer_name ?? "").trim() || phone,
+            current_balance: currentBalance + amount,
+            updated_at: new Date().toISOString(),
+          });
+      }
+
       return inv;
     },
+
     onSuccess: (inv) => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("تم نقل الفاتورة إلى تبويب «تم الإرسال»");
