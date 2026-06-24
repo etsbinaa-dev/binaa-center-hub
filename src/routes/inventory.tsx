@@ -207,33 +207,37 @@ function QuantitiesPage() {
         const low      = allIron.filter((i) => i.qty >= 10 && i.qty < 50);
         const normal   = allIron.filter((i) => i.qty >= 50);
 
-        const pad = (label: string, qty: number) => {
-          const dots = ".".repeat(Math.max(1, 28 - label.length));
-          return `  ${label} ${dots} ${qty}`;
+        // monospace row: pad label to 20 chars then qty
+        const row = (label: string, qty: number) => {
+          const padded = label.padEnd(20, " ");
+          return `  ${padded} ${String(qty).padStart(4)} بريكة`;
         };
 
-        const sections: string[] = [];
+        const blockLines: string[] = [];
 
         if (critical.length > 0) {
-          sections.push("🔴 ـــــــــ حرج ـــــــــ");
-          critical.forEach((i) => sections.push(pad(i.label, i.qty)));
+          blockLines.push("🔴 ـــــ حرج ـــــ");
+          critical.forEach((i) => blockLines.push(row(i.label, i.qty)));
         }
         if (low.length > 0) {
-          sections.push("");
-          sections.push("🟡 ـــــــ منخفض ـــــــ");
-          low.forEach((i) => sections.push(pad(i.label, i.qty)));
+          blockLines.push("");
+          blockLines.push("🟡 ـــ منخفض ـــ");
+          low.forEach((i) => blockLines.push(row(i.label, i.qty)));
         }
         if (normal.length > 0) {
-          sections.push("");
-          sections.push("🟢 ـــــــ عادي ـــــــــ");
-          normal.forEach((i) => sections.push(pad(i.label, i.qty)));
+          blockLines.push("");
+          blockLines.push("🟢 ـــ عادي ـــــ");
+          normal.forEach((i) => blockLines.push(row(i.label, i.qty)));
         }
 
+        // wrap in monospace code block for telegram
+        const block = "```\n" + blockLines.join("\n") + "\n```";
+
         const tgText = [
-          "📦 مخزون الحديد",
-          `🕒 ${now}`,
+          `📦 *مخزون الحديد*`,
+          `🕒 ${escapeMd(now)}`,
           "",
-          ...sections,
+          block,
         ].join("\n");
         void sendTelegramRaw({ data: { text: tgText } }).catch(() => {});
       } catch {
