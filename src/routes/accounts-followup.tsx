@@ -164,11 +164,27 @@ function AccountsFollowupPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const customers = groups.length;
-    const overdue = groups.filter((g) => g.has_overdue).length;
-    const totalRemaining = groups.reduce((s, g) => s + g.current_balance, 0);
+    const activeGroups = groups.filter((g) => g.current_balance > 0);
+    const customers = activeGroups.length;
+    const overdue = activeGroups.filter((g) => g.has_overdue).length;
+    const totalRemaining = activeGroups.reduce((s, g) => s + g.current_balance, 0);
     return { customers, overdue, totalRemaining };
   }, [groups]);
+
+  const filteredGroups = useMemo(() => {
+    return groups
+      .filter((g) => g.current_balance > 0)
+      .filter((g) => activeFilter === "overdue" ? g.has_overdue : true)
+      .filter((g) => {
+        if (!search.trim()) return true;
+        const q = search.trim().toLowerCase();
+        return g.name.toLowerCase().includes(q) || g.phone.includes(q);
+      })
+      .sort((a, b) => {
+        if (a.has_overdue !== b.has_overdue) return a.has_overdue ? -1 : 1;
+        return b.current_balance - a.current_balance;
+      });
+  }, [groups, search, activeFilter]);
 
   async function distributePayment(g: ClientGroup, amount: number): Promise<number> {
     let remaining = amount;
