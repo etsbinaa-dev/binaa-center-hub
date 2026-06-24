@@ -187,8 +187,71 @@ export const upsertCustomerBalance = createServerFn({ method: "POST" })
         { onConflict: "phone" },
       );
     if (error) throw new Error(error.message);
+
+    // تصفير جميع فواتير العميل عند بدء الحساب من rimsoft
+    await context.supabase
+      .from("invoices")
+      .update({
+        paid_amount: 0,
+        payment_status: "unpaid",
+        paid_at: null,
+      })
+      .eq("customer_phone", data.phone)
+      .eq("status", "sent");
+
     return { ok: true };
   });
+
+// ---------- Apply client-level payment (operates on current_balance) ----------
+export const applyClientPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      phone: z.string().min(1),
+      name: z.string().default(""),
+      mode: z.enum(["partial", "full"]),
+      amount: z.number().positive().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const phone = normalisePhone(data.phone);
+    if (!phone) throw new Error("رقم غير صالح");
+
+    const { data: bal, error: be } = await context.supabase
+      .from("customer_balances")
+      .select("current_balance")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (be) throw new Error(be.message);
+
+    const current = Number((bal as any)?.current_balance ?? 0);
+
+    let newBalance: number;
+    if (data.mode === "full") {
+      newBalance = 0;
+    } else {
+      const amount = Number(data.amount ?? 0);
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error("مبلغ غير صالح");
+      newBalance = Math.max(0, current - amount);
+    }
+
+    const { error } = await context.supabase
+      .from("customer_balances")
+      .upsert(
+        {
+          phone,
+          name: data.name,
+          current_balance: newBalance,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "phone" },
+      );
+    if (error) throw new Error(error.message);
+
+    return { ok: true, current_balance: newBalance };
+  });
+
 
 // ---------- Listing: grouped by customer_phone with balances ----------
 export const listFollowupGroups = createServerFn({ method: "GET" })

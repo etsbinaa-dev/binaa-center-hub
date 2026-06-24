@@ -13,9 +13,11 @@ import {
   runFollowupScanFn,
   applyInvoicePayment,
   upsertCustomerBalance,
+  applyClientPayment,
   type ClientGroup,
   type ClientInvoice,
 } from "@/lib/accounts-followup.functions";
+
 
 export const Route = createFileRoute("/accounts-followup")({
   head: () => ({ meta: [{ title: "متابعة الدفع — بِناء HUB" }] }),
@@ -102,6 +104,8 @@ function AccountsFollowupPage() {
   const runScan = useServerFn(runFollowupScanFn);
   const applyPayment = useServerFn(applyInvoicePayment);
   const saveBalance = useServerFn(upsertCustomerBalance);
+  const clientPay = useServerFn(applyClientPayment);
+
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -350,16 +354,6 @@ function AccountsFollowupPage() {
             <div className="font-bold text-amber-700 dark:text-amber-300">{fmtMoney(inv.remaining)}</div>
           </div>
         </div>
-        {inv.payment_status !== "paid" && (
-          <div className="flex flex-wrap gap-1">
-            <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onPartialPay(inv)}>
-              دفع جزئي
-            </Button>
-            <Button size="sm" className="h-7 text-[11px]" onClick={() => onFullPay(inv)}>
-              تسديد كامل
-            </Button>
-          </div>
-        )}
       </li>
     );
   };
@@ -387,15 +381,47 @@ function AccountsFollowupPage() {
               </div>
             )}
           </div>
-          {waLink && (
-            <Button
-              size="sm"
-              className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {waLink && (
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+              >
+                <Send className="h-4 w-4 ml-1" /> واتساب
+              </Button>
+            )}
+            <button
+              onClick={async () => {
+                const input = window.prompt(`الرصيد الحالي: ${fmtMoney(g.current_balance)}\nكم تم دفعه؟`);
+                if (input == null) return;
+                const amount = Number(input);
+                if (!Number.isFinite(amount) || amount <= 0) { toast.error("مبلغ غير صالح"); return; }
+                try {
+                  await clientPay({ data: { phone: g.phone, name: g.name, mode: "partial", amount } });
+                  toast.success("تم تسجيل الدفعة");
+                  reload();
+                } catch (e) { toast.error(getErrorMessage(e)); }
+              }}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted transition-colors"
             >
-              <Send className="h-4 w-4 ml-1" /> واتساب
-            </Button>
-          )}
+              دفع جزئي
+            </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm(`تأكيد تسديد رصيد ${g.name} بالكامل؟`)) return;
+                try {
+                  await clientPay({ data: { phone: g.phone, name: g.name, mode: "full" } });
+                  toast.success("تم تسديد الرصيد بالكامل ✅");
+                  reload();
+                } catch (e) { toast.error(getErrorMessage(e)); }
+              }}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              تسديد كامل
+            </button>
+          </div>
+
         </div>
 
         {/* Current balance card — click to edit */}
