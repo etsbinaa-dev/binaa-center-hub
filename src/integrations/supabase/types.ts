@@ -338,6 +338,7 @@ export type Database = {
           paid_amount: number
           paid_at: string | null
           payment_status: string
+          printed_ttc: number | null
           sent_at: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           updated_at: string
@@ -357,6 +358,7 @@ export type Database = {
           paid_amount?: number
           paid_at?: string | null
           payment_status?: string
+          printed_ttc?: number | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
@@ -376,6 +378,7 @@ export type Database = {
           paid_amount?: number
           paid_at?: string | null
           payment_status?: string
+          printed_ttc?: number | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
