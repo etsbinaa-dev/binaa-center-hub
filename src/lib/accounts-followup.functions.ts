@@ -188,15 +188,11 @@ export const upsertCustomerBalance = createServerFn({ method: "POST" })
       );
     if (error) throw new Error(error.message);
 
-    // تصفير جميع فواتير العميل عند بدء الحساب من rimsoft
+    // حذف جميع فواتير العميل المرسلة عند إدخال رصيد rimsoft
     await context.supabase
       .from("invoices")
-      .update({
-        paid_amount: 0,
-        payment_status: "unpaid",
-        paid_at: null,
-      })
-      .eq("customer_phone", data.phone)
+      .delete()
+      .eq("customer_phone", phone)
       .eq("status", "sent");
 
     return { ok: true };

@@ -203,11 +203,38 @@ function QuantitiesPage() {
           dateStyle: "short",
           timeStyle: "short",
         }).format(new Date());
-        const lines = allIron.map((item) => {
-          const s = getStatus(item.qty);
-          return `${s.emoji} ${item.label} — ${item.qty} بريكة (${s.label})`;
-        });
-        const tgText = ["📦 تحديث مخزون الحديد", `🕒 ${now}`, "", ...lines].join("\n");
+        const critical = allIron.filter((i) => i.qty < 10);
+        const low      = allIron.filter((i) => i.qty >= 10 && i.qty < 50);
+        const normal   = allIron.filter((i) => i.qty >= 50);
+
+        const pad = (label: string, qty: number) => {
+          const dots = ".".repeat(Math.max(1, 28 - label.length));
+          return `  ${label} ${dots} ${qty}`;
+        };
+
+        const sections: string[] = [];
+
+        if (critical.length > 0) {
+          sections.push("🔴 ـــــــــ حرج ـــــــــ");
+          critical.forEach((i) => sections.push(pad(i.label, i.qty)));
+        }
+        if (low.length > 0) {
+          sections.push("");
+          sections.push("🟡 ـــــــ منخفض ـــــــ");
+          low.forEach((i) => sections.push(pad(i.label, i.qty)));
+        }
+        if (normal.length > 0) {
+          sections.push("");
+          sections.push("🟢 ـــــــ عادي ـــــــــ");
+          normal.forEach((i) => sections.push(pad(i.label, i.qty)));
+        }
+
+        const tgText = [
+          "📦 مخزون الحديد",
+          `🕒 ${now}`,
+          "",
+          ...sections,
+        ].join("\n");
         void sendTelegramRaw({ data: { text: tgText } }).catch(() => {});
       } catch {
         /* ignore */
