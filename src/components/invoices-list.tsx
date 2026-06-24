@@ -129,13 +129,16 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
       // أضف مبلغ الفاتورة إلى رصيد العميل في customer_balances
       const { data: invData } = await supabase
         .from("invoices")
-        .select("customer_phone, customer_name, amount")
+        .select("customer_phone, customer_name, amount, printed_ttc")
         .eq("id", inv.id)
         .maybeSingle();
 
-      if (invData?.customer_phone && invData?.amount) {
+      // نستخدم printed_ttc (TTC المطبوع) وليس amount (الذي قد يشمل مبلغ القلم)
+      const ttcToAdd = Number((invData as any)?.printed_ttc ?? (invData as any)?.amount ?? 0);
+
+      if (invData?.customer_phone && ttcToAdd > 0) {
         const phone = invData.customer_phone.trim();
-        const amount = Number(invData.amount ?? 0);
+        const amount = ttcToAdd;
 
         const { data: bal } = await supabase
           .from("customer_balances")
@@ -225,6 +228,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     let customer_phone = "";
     let invoice_number = fallbackInv;
     let amount: number | null = null;
+    let printed_ttc: number | null = null;
     let missingFlag = false;
 
     try {
@@ -236,6 +240,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
       if (extracted.customer_phone) customer_phone = extracted.customer_phone;
       if (extracted.invoice_number) invoice_number = extracted.invoice_number;
       if (extracted.amount != null) amount = extracted.amount;
+      if ((extracted as any).printed_ttc != null) printed_ttc = (extracted as any).printed_ttc;
       if (!extracted.customer_name && !extracted.customer_phone) {
         missingFlag = true;
         toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
@@ -254,6 +259,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
         customer_phone,
         invoice_number,
         amount,
+        printed_ttc,
         image_path: path,
         status: "new",
         created_by: user?.id ?? null,
