@@ -87,7 +87,7 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
         )
         .eq("status", "archived");
       if (view === "archive") q = q.eq("delivery_status", "delivered");
-      else q = q.in("delivery_status", ["new", "in_progress"]);
+      else q = q.in("delivery_status", ["new", "in_progress", "partial"]);
       const { data, error } = await q;
       if (error) throw error;
       const list = (data as unknown as DeliveryOrder[]) ?? [];
@@ -241,9 +241,31 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       </Button>
                     )}
                     {o.delivery_status === "in_progress" && (
-                      <Button size="sm" variant="default" onClick={() => completeDelivery.mutate(o.id)}>
-                        <PackageCheck className="h-4 w-4 ml-1" />تم التسليم
-                      </Button>
+                      <>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
+                          if (notes === null) return;
+                          const { error } = await supabase
+                            .from("orders")
+                            .update({ delivery_status: "partial", delivery_notes: notes || null })
+                            .eq("id", o.id);
+                          if (error) toast.error(error.message);
+                          else { toast.success("تم تسجيل التسليم الجزئي"); qc.invalidateQueries({ queryKey: ["delivery"] }); }
+                        }}>
+                          <PackageCheck className="h-4 w-4 ml-1" />تسليم جزئي
+                        </Button>
+                        <Button size="sm" variant="default" onClick={() => completeDelivery.mutate(o.id)}>
+                          <PackageCheck className="h-4 w-4 ml-1" />تم التسليم
+                        </Button>
+                      </>
+                    )}
+                    {o.delivery_status === "partial" && (
+                      <>
+                        <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">📦 جزئي</span>
+                        <Button size="sm" variant="default" onClick={() => completeDelivery.mutate(o.id)}>
+                          <PackageCheck className="h-4 w-4 ml-1" />تم التسليم كاملاً
+                        </Button>
+                      </>
                     )}
                     {o.customers?.id && (
                       locationOrderId === o.id ? (
