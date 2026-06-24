@@ -114,25 +114,26 @@ function AccountsFollowupPage() {
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
   const [editingAmount, setEditingAmount] = useState<Record<string, string>>({});
   const [editingBalance, setEditingBalance] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<"all" | "overdue">("all");
 
   async function reload() {
+    const scrollY = window.scrollY;
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session?.access_token) {
       setGroups([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
     try {
       const r = await fetchList();
       const list = Array.isArray((r as any)?.groups) ? (r as any).groups as ClientGroup[] : [];
       setGroups(list);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: "instant" }));
     } catch (e) {
       logErr("reload", e);
       toast.error(getErrorMessage(e) || "تعذر تحميل البيانات");
       setGroups([]);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -163,11 +164,27 @@ function AccountsFollowupPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const customers = groups.length;
-    const overdue = groups.filter((g) => g.has_overdue).length;
-    const totalRemaining = groups.reduce((s, g) => s + g.current_balance, 0);
+    const activeGroups = groups.filter((g) => g.current_balance > 0);
+    const customers = activeGroups.length;
+    const overdue = activeGroups.filter((g) => g.has_overdue).length;
+    const totalRemaining = activeGroups.reduce((s, g) => s + g.current_balance, 0);
     return { customers, overdue, totalRemaining };
   }, [groups]);
+
+  const filteredGroups = useMemo(() => {
+    return groups
+      .filter((g) => g.current_balance > 0)
+      .filter((g) => activeFilter === "overdue" ? g.has_overdue : true)
+      .filter((g) => {
+        if (!search.trim()) return true;
+        const q = search.trim().toLowerCase();
+        return g.name.toLowerCase().includes(q) || g.phone.includes(q);
+      })
+      .sort((a, b) => {
+        if (a.has_overdue !== b.has_overdue) return a.has_overdue ? -1 : 1;
+        return b.current_balance - a.current_balance;
+      });
+  }, [groups, search, activeFilter]);
 
   async function distributePayment(g: ClientGroup, amount: number): Promise<number> {
     let remaining = amount;
@@ -475,19 +492,25 @@ function AccountsFollowupPage() {
     );
   };
 
-  const overdueGroups = groups.filter((g) => g.has_overdue);
-  const regularGroups = groups.filter((g) => !g.has_overdue);
+  const overdueGroups = filteredGroups.filter((g) => g.has_overdue);
+  const regularGroups = filteredGroups.filter((g) => !g.has_overdue);
 
   return (
     <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
       <div className="mx-auto max-w-3xl space-y-4 pb-12">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2">
-          <Card className="p-3 text-center">
+          <Card
+            className={`p-3 text-center cursor-pointer transition-all ${activeFilter === "all" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => setActiveFilter("all")}
+          >
             <div className="text-[10px] text-muted-foreground">عملاء بحسابات قائمة</div>
             <div className="text-xl font-bold">{stats.customers}</div>
           </Card>
-          <Card className="p-3 text-center border-orange-400">
+          <Card
+            className={`p-3 text-center cursor-pointer transition-all border-orange-400 ${activeFilter === "overdue" ? "ring-2 ring-orange-400" : ""}`}
+            onClick={() => setActiveFilter(activeFilter === "overdue" ? "all" : "overdue")}
+          >
             <div className="text-[10px] text-muted-foreground">متأخرون</div>
             <div className="text-xl font-bold text-orange-600">{stats.overdue}</div>
           </Card>
@@ -500,10 +523,18 @@ function AccountsFollowupPage() {
           </Card>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="بحث باسم العميل أو الرقم..."
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            dir="rtl"
+          />
           <Button size="sm" variant="outline" disabled={busy} onClick={onRunScan}>
             <RefreshCcw className={`h-4 w-4 ml-1 ${busy ? "animate-spin" : ""}`} />
-            فحص وإرسال التذكيرات
+            فحص
           </Button>
         </div>
 
