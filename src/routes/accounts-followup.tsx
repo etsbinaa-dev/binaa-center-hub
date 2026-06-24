@@ -381,15 +381,47 @@ function AccountsFollowupPage() {
               </div>
             )}
           </div>
-          {waLink && (
-            <Button
-              size="sm"
-              className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {waLink && (
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => window.open(waLink, "_blank", "noopener,noreferrer")}
+              >
+                <Send className="h-4 w-4 ml-1" /> واتساب
+              </Button>
+            )}
+            <button
+              onClick={async () => {
+                const input = window.prompt(`الرصيد الحالي: ${fmtMoney(g.current_balance)}\nكم تم دفعه؟`);
+                if (input == null) return;
+                const amount = Number(input);
+                if (!Number.isFinite(amount) || amount <= 0) { toast.error("مبلغ غير صالح"); return; }
+                try {
+                  await clientPay({ data: { phone: g.phone, name: g.name, mode: "partial", amount } });
+                  toast.success("تم تسجيل الدفعة");
+                  reload();
+                } catch (e) { toast.error(getErrorMessage(e)); }
+              }}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold hover:bg-muted transition-colors"
             >
-              <Send className="h-4 w-4 ml-1" /> واتساب
-            </Button>
-          )}
+              دفع جزئي
+            </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm(`تأكيد تسديد رصيد ${g.name} بالكامل؟`)) return;
+                try {
+                  await clientPay({ data: { phone: g.phone, name: g.name, mode: "full" } });
+                  toast.success("تم تسديد الرصيد بالكامل ✅");
+                  reload();
+                } catch (e) { toast.error(getErrorMessage(e)); }
+              }}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              تسديد كامل
+            </button>
+          </div>
+
         </div>
 
         {/* Current balance card — click to edit */}
