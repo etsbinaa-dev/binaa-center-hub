@@ -228,6 +228,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
     let customer_phone = "";
     let invoice_number = fallbackInv;
     let amount: number | null = null;
+    let printed_ttc: number | null = null;
     let missingFlag = false;
 
     try {
@@ -239,6 +240,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
       if (extracted.customer_phone) customer_phone = extracted.customer_phone;
       if (extracted.invoice_number) invoice_number = extracted.invoice_number;
       if (extracted.amount != null) amount = extracted.amount;
+      if ((extracted as any).printed_ttc != null) printed_ttc = (extracted as any).printed_ttc;
       if (!extracted.customer_name && !extracted.customer_phone) {
         missingFlag = true;
         toast.warning(`${f.name}: تعذر استخراج بيانات العميل من الفاتورة`);
