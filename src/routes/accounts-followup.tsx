@@ -125,18 +125,15 @@ function AccountsFollowupPage() {
       setLoading(false);
       return;
     }
-    setLoading(true);
     try {
       const r = await fetchList();
       const list = Array.isArray((r as any)?.groups) ? (r as any).groups as ClientGroup[] : [];
       setGroups(list);
-      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: "instant" }));
+      setTimeout(() => window.scrollTo({ top: scrollY, behavior: "instant" }), 50);
     } catch (e) {
       logErr("reload", e);
       toast.error(getErrorMessage(e) || "تعذر تحميل البيانات");
       setGroups([]);
-    } finally {
-      setLoading(false);
     }
   }
 
