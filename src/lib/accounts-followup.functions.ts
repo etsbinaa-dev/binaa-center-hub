@@ -19,9 +19,6 @@ export type ClientInvoice = {
 export type ClientGroup = {
   phone: string;
   name: string;
-  initial_balance: number;
-  invoices_total: number;
-  total_paid: number;
   current_balance: number;
   invoices: ClientInvoice[];
   has_overdue: boolean;
