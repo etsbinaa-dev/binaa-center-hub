@@ -109,7 +109,7 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     await ensureAdmin(context);
     const { data: inv, error: ie } = await context.supabase
       .from("invoices")
-      .select("amount, paid_amount")
+      .select("amount, paid_amount, customer_phone")
       .eq("id", data.invoice_id)
       .maybeSingle();
     if (ie) throw new Error(ie.message);
@@ -129,6 +129,7 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     }
     const remaining = Math.max(0, total - newPaid);
     const status = remaining <= 0 ? "paid" : newPaid > 0 ? "partial" : "unpaid";
+    const amountPaidNow = Math.max(0, newPaid - currentPaid);
     const update = {
       paid_amount: newPaid,
       payment_status: status,
@@ -139,6 +140,23 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
       .update(update)
       .eq("id", data.invoice_id);
     if (error) throw new Error(error.message);
+
+    // Decrement live customer balance by the amount just paid
+    const phone = normalisePhone((inv as any).customer_phone);
+    if (phone && amountPaidNow > 0) {
+      const { data: bal } = await context.supabase
+        .from("customer_balances")
+        .select("current_balance")
+        .eq("phone", phone)
+        .maybeSingle();
+      if (bal) {
+        const next = Math.max(0, num((bal as any).current_balance) - amountPaidNow);
+        await context.supabase
+          .from("customer_balances")
+          .update({ current_balance: next })
+          .eq("phone", phone);
+      }
+    }
     return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
   });
 
