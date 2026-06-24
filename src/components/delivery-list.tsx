@@ -72,6 +72,8 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [startTarget, setStartTarget] = useState<DeliveryOrder | null>(null);
+  const [locationOrderId, setLocationOrderId] = useState<string | null>(null);
+  const [locationDraft, setLocationDraft] = useState({ lat: "", lng: "", notes: "" });
 
   const { data: orders = [], isLoading, isError, error } = useQuery<DeliveryOrder[], Error>({
     queryKey: ["delivery", view, search],
