@@ -688,6 +688,30 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tracking_url: string | null
+          url_updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name?: string
+          tracking_url?: string | null
+          url_updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tracking_url?: string | null
+          url_updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
