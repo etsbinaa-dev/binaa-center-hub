@@ -114,6 +114,8 @@ function AccountsFollowupPage() {
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
   const [editingAmount, setEditingAmount] = useState<Record<string, string>>({});
   const [editingBalance, setEditingBalance] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<"all" | "overdue">("all");
 
   async function reload() {
     const { data: sess } = await supabase.auth.getSession();
