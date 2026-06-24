@@ -125,6 +125,7 @@ function AccountsFollowupPage() {
       setLoading(false);
       return;
     }
+    setLoading(true);
     try {
       const r = await fetchList();
       const list = Array.isArray((r as any)?.groups) ? (r as any).groups as ClientGroup[] : [];
@@ -134,6 +135,8 @@ function AccountsFollowupPage() {
       logErr("reload", e);
       toast.error(getErrorMessage(e) || "تعذر تحميل البيانات");
       setGroups([]);
+    } finally {
+      setLoading(false);
     }
   }
 
