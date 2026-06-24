@@ -147,9 +147,9 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
       .neq("status", "done")
       .order("created_at", { ascending: false }),
     supabaseAdmin
-      .from("invoices")
-      .select("customer_name, amount, amount_manual, paid_amount")
-      .eq("payment_status", "unpaid"),
+      .from("customer_balances")
+      .select("name, phone, current_balance")
+      .gt("current_balance", 0),
 
     supabaseAdmin.from("app_settings").select("critical_quantity").eq("id", 1).maybeSingle(),
   ]);
@@ -184,12 +184,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
   const deliveryLines =
     activeDeliveries.length === 0
       ? ["—"]
-      : activeDeliveries.map((o) => {
-          const name = o.customer?.name ?? "—";
-          const details = (o.details ?? "").toString().trim().replace(/\s+/g, " ");
-          const short = details.length > 120 ? details.slice(0, 120) + "…" : details || "—";
-          return `• ${name} — ${short}`;
-        });
+      : activeDeliveries.map((o) => `• ${o.customer?.name ?? "—"}`);
 
   const invoiceLines =
     unsentInvoices.length === 0
@@ -199,11 +194,8 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
   const overdueLines =
     overdueAccounts.length === 0
       ? ["—"]
-      : overdueAccounts.map((inv: any) => {
-          const total = Number(inv.amount ?? 0);
-          const paid = Number(inv.paid_amount ?? 0);
-          const remaining = Math.max(total - paid, 0);
-          return `• ${inv.customer_name ?? "—"}: ${fmtMoney(remaining)}`;
+      : overdueAccounts.map((bal: any) => {
+          return `• ${bal.name || bal.phone || "—"}: ${fmtMoney(Number(bal.current_balance ?? 0))}`;
         });
 
 
@@ -248,7 +240,7 @@ export async function runDailyReport(supabaseAdmin: any, opts: RunOptions = {}) 
     `📝 قيود غير معالجة (${tempPendingRows.length}):`,
     ...tempLines,
     "",
-    `⏰ حسابات متأخرة (${overdueAccounts.length}):`,
+    `⏰ حسابات مستحقة (${overdueAccounts.length}):`,
     ...overdueLines,
     "",
     "📥 استقبال اليوم:",
