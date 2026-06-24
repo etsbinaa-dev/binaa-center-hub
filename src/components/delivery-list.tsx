@@ -31,7 +31,7 @@ import { OrderAttachmentsView } from "@/components/order-attachments-view";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
 
-type DeliveryStatus = "new" | "in_progress" | "delivered";
+type DeliveryStatus = "new" | "in_progress" | "delivered" | "partial";
 
 type DeliveryOrder = {
   id: string;
