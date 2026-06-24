@@ -43,6 +43,12 @@ function formatTimestamp(): string {
   }
 }
 
+export function escapeMd(s: string): string {
+  return s.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, "\\$&");
+}
+
+
+
 export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: number; errors: string[] }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = getChatIds();
