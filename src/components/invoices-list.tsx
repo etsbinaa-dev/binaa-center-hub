@@ -259,6 +259,7 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
         customer_phone,
         invoice_number,
         amount,
+        printed_ttc,
         image_path: path,
         status: "new",
         created_by: user?.id ?? null,
