@@ -13,9 +13,11 @@ import {
   runFollowupScanFn,
   applyInvoicePayment,
   upsertCustomerBalance,
+  applyClientPayment,
   type ClientGroup,
   type ClientInvoice,
 } from "@/lib/accounts-followup.functions";
+
 
 export const Route = createFileRoute("/accounts-followup")({
   head: () => ({ meta: [{ title: "متابعة الدفع — بِناء HUB" }] }),
