@@ -502,7 +502,7 @@ function AccountsFollowupPage() {
     <AppShell moduleKey="accounts_followup" title="متابعة الدفع">
       <div className="mx-auto max-w-3xl space-y-4 pb-12">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Card
             className={`p-3 text-center cursor-pointer transition-all ${activeFilter === "all" ? "ring-2 ring-primary" : ""}`}
             onClick={() => setActiveFilter("all")}
@@ -516,13 +516,6 @@ function AccountsFollowupPage() {
           >
             <div className="text-[10px] text-muted-foreground">متأخرون</div>
             <div className="text-xl font-bold text-orange-600">{stats.overdue}</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-[10px] text-muted-foreground">إجمالي المستحق</div>
-            <div className="text-base font-bold text-amber-700 dark:text-amber-300">
-              {fmtMoney(stats.totalRemaining)}
-            </div>
-            <div className="text-[10px] text-muted-foreground">MRO</div>
           </Card>
         </div>
 
