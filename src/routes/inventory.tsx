@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
+import { sendTelegramRaw } from "@/lib/telegram-alert.functions";
 
 const DEFAULT_CRITICAL_THRESHOLD = 5;
 const DEFAULT_LOW_STOCK_THRESHOLD = 50;
