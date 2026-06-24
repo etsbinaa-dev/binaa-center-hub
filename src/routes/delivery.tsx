@@ -3,6 +3,7 @@ import { Truck, Archive } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { DeliveryList } from "@/components/delivery-list";
+import { VehiclesTracker } from "@/components/vehicles-tracker";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/delivery")({
@@ -19,6 +20,7 @@ function DeliveryPage() {
       <RequireAuth>
         <div className="space-y-5">
           <Tabs isArchive={isArchive} />
+          <VehiclesTracker />
           {pathname === "/delivery" ? <DeliveryList view="active" /> : <Outlet />}
         </div>
       </RequireAuth>
