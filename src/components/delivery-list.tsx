@@ -245,6 +245,46 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                         <PackageCheck className="h-4 w-4 ml-1" />تم التسليم
                       </Button>
                     )}
+                    {o.customers?.id && (
+                      locationOrderId === o.id ? (
+                        <div className="w-full border rounded-lg p-2 space-y-2 text-xs mt-1">
+                          <div className="font-bold text-center">📍 موقع العميل</div>
+                          <div className="flex gap-1">
+                            <input className="flex-1 rounded border px-2 py-1 text-xs" placeholder="Latitude" dir="ltr"
+                              value={locationDraft.lat}
+                              onChange={(e) => setLocationDraft((s) => ({ ...s, lat: e.target.value }))} />
+                            <input className="flex-1 rounded border px-2 py-1 text-xs" placeholder="Longitude" dir="ltr"
+                              value={locationDraft.lng}
+                              onChange={(e) => setLocationDraft((s) => ({ ...s, lng: e.target.value }))} />
+                          </div>
+                          <input className="w-full rounded border px-2 py-1 text-xs" placeholder="ملاحظة (اختياري)"
+                            value={locationDraft.notes}
+                            onChange={(e) => setLocationDraft((s) => ({ ...s, notes: e.target.value }))} />
+                          <div className="flex gap-1 justify-end">
+                            <Button size="sm" variant="outline" onClick={() => setLocationOrderId(null)}>إلغاء</Button>
+                            <Button size="sm" onClick={async () => {
+                              const lat = Number(locationDraft.lat);
+                              const lng = Number(locationDraft.lng);
+                              if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error("إحداثيات غير صالحة"); return; }
+                              await supabase.from("customers").update({
+                                location_lat: lat,
+                                location_lng: lng,
+                                location_notes: locationDraft.notes || null,
+                              }).eq("id", o.customers!.id);
+                              toast.success("تم حفظ موقع العميل ✅");
+                              setLocationOrderId(null);
+                            }}>حفظ</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setLocationOrderId(o.id);
+                          setLocationDraft({ lat: "", lng: "", notes: "" });
+                        }}>
+                          📍 حفظ موقع العميل
+                        </Button>
+                      )
+                    )}
                   </div>
                 )}
               </Card>
