@@ -369,18 +369,18 @@ function AccountsFollowupPage() {
         key={g.phone}
         className={`rounded-lg border p-3 space-y-2 ${g.has_overdue ? "border-orange-400 bg-orange-50/40 dark:bg-orange-950/20" : ""}`}
       >
+        {/* اسم العميل فوق الأزرار */}
+        <div>
+          <div className="font-bold text-base">{g.name || "—"}</div>
+          <div className="text-xs text-muted-foreground" dir="ltr">{g.phone || "—"}</div>
+          {g.has_overdue && (
+            <span className="mt-1 inline-block rounded-full bg-orange-500 text-white px-2 py-0.5 text-[10px] font-bold">
+              متأخر {maxDays} يوم
+            </span>
+          )}
+        </div>
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="font-semibold truncate">{g.name || "—"}</div>
-            <div className="text-xs text-muted-foreground" dir="ltr">{g.phone || "—"}</div>
-            {g.has_overdue && (
-              <div className="mt-1">
-                <span className="rounded-full bg-orange-500 text-white px-2 py-0.5 text-[10px] font-bold">
-                  متأخر {maxDays} يوم
-                </span>
-              </div>
-            )}
-          </div>
+          <div className="min-w-0" />
           <div className="flex shrink-0 flex-wrap items-center gap-1">
             {waLink && (
               <Button
