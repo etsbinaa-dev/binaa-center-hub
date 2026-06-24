@@ -196,9 +196,6 @@ function AccountsFollowupPage() {
     const parts = [
       `مرحباً ${g.name || ""}،`,
       `تذكير بخصوص حسابكم لدينا:`,
-      g.initial_balance > 0 ? `رصيد سابق: ${fmtMoney(g.initial_balance)} MRO` : "",
-      g.invoices_total > 0 ? `فواتير جديدة: ${fmtMoney(g.invoices_total)} MRO` : "",
-      g.total_paid > 0 ? `المدفوع: ${fmtMoney(g.total_paid)} MRO` : "",
       `الرصيد المستحق: ${fmtMoney(g.current_balance)} MRO`,
       lines,
     ].filter(Boolean);
@@ -214,8 +211,8 @@ function AccountsFollowupPage() {
       return;
     }
     try {
-      await saveBalance({ data: { phone: g.phone, name: g.name, initial_balance: n } });
-      toast.success("تم حفظ رصيد rimsoft");
+      await saveBalance({ data: { phone: g.phone, name: g.name, current_balance: n } });
+      toast.success("تم حفظ الرصيد");
       setEditingBalance((s) => { const c = { ...s }; delete c[g.phone]; return c; });
       reload();
     } catch (e) {
