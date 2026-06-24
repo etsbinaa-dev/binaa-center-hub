@@ -104,6 +104,8 @@ function AccountsFollowupPage() {
   const runScan = useServerFn(runFollowupScanFn);
   const applyPayment = useServerFn(applyInvoicePayment);
   const saveBalance = useServerFn(upsertCustomerBalance);
+  const clientPay = useServerFn(applyClientPayment);
+
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
