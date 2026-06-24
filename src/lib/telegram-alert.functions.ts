@@ -82,3 +82,7 @@ export const sendTelegramAlert = createServerFn({ method: "POST" })
     const text = [HEADER[data.kind] ?? "🔔 إشعار", "", data.message, "", `🕒 ${formatTimestamp()}`].join("\n");
     return sendTelegram(text);
   });
+
+export const sendTelegramRaw = createServerFn({ method: "POST" })
+  .inputValidator((d: { text: string }) => d)
+  .handler(async ({ data }) => sendTelegram(data.text));
