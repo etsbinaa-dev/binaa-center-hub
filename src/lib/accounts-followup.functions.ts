@@ -19,9 +19,6 @@ export type ClientInvoice = {
 export type ClientGroup = {
   phone: string;
   name: string;
-  initial_balance: number;
-  invoices_total: number;
-  total_paid: number;
   current_balance: number;
   invoices: ClientInvoice[];
   has_overdue: boolean;
@@ -112,7 +109,7 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     await ensureAdmin(context);
     const { data: inv, error: ie } = await context.supabase
       .from("invoices")
-      .select("amount, paid_amount")
+      .select("amount, paid_amount, customer_phone")
       .eq("id", data.invoice_id)
       .maybeSingle();
     if (ie) throw new Error(ie.message);
@@ -132,6 +129,7 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
     }
     const remaining = Math.max(0, total - newPaid);
     const status = remaining <= 0 ? "paid" : newPaid > 0 ? "partial" : "unpaid";
+    const amountPaidNow = Math.max(0, newPaid - currentPaid);
     const update = {
       paid_amount: newPaid,
       payment_status: status,
@@ -142,6 +140,23 @@ export const applyInvoicePayment = createServerFn({ method: "POST" })
       .update(update)
       .eq("id", data.invoice_id);
     if (error) throw new Error(error.message);
+
+    // Decrement live customer balance by the amount just paid
+    const phone = normalisePhone((inv as any).customer_phone);
+    if (phone && amountPaidNow > 0) {
+      const { data: bal } = await context.supabase
+        .from("customer_balances")
+        .select("current_balance")
+        .eq("phone", phone)
+        .maybeSingle();
+      if (bal) {
+        const next = Math.max(0, num((bal as any).current_balance) - amountPaidNow);
+        await context.supabase
+          .from("customer_balances")
+          .update({ current_balance: next })
+          .eq("phone", phone);
+      }
+    }
     return { ok: true, paid_amount: newPaid, remaining, payment_status: status };
   });
 
@@ -153,7 +168,7 @@ export const upsertCustomerBalance = createServerFn({ method: "POST" })
       .object({
         phone: z.string().min(1),
         name: z.string().optional().default(""),
-        initial_balance: z.number().nonnegative(),
+        current_balance: z.number().nonnegative(),
       })
       .parse(d),
   )
@@ -167,7 +182,7 @@ export const upsertCustomerBalance = createServerFn({ method: "POST" })
         {
           phone,
           name: data.name ?? "",
-          initial_balance: data.initial_balance,
+          current_balance: data.current_balance,
         },
         { onConflict: "phone" },
       );
@@ -193,14 +208,14 @@ export const listFollowupGroups = createServerFn({ method: "GET" })
 
     const { data: balances, error: be } = await context.supabase
       .from("customer_balances")
-      .select("phone, name, initial_balance");
+      .select("phone, name, current_balance");
     if (be) throw new Error(be.message);
 
-    const balanceMap = new Map<string, { name: string; initial_balance: number }>();
+    const balanceMap = new Map<string, { name: string; current_balance: number }>();
     for (const b of balances ?? []) {
       balanceMap.set(normalisePhone((b as any).phone), {
         name: (b as any).name ?? "",
-        initial_balance: num((b as any).initial_balance),
+        current_balance: num((b as any).current_balance),
       });
     }
 
@@ -217,10 +232,7 @@ export const listFollowupGroups = createServerFn({ method: "GET" })
         g = {
           phone,
           name: bal?.name || inv.customer_name || "",
-          initial_balance: bal?.initial_balance ?? 0,
-          invoices_total: 0,
-          total_paid: 0,
-          current_balance: 0,
+          current_balance: bal?.current_balance ?? 0,
           invoices: [],
           has_overdue: false,
           oldest_unpaid_sent_at: null,
@@ -250,25 +262,20 @@ export const listFollowupGroups = createServerFn({ method: "GET" })
         is_overdue: isOverdue,
       };
       g.invoices.push(ci);
-      g.invoices_total += amount;
-      g.total_paid += paid;
       if (isOverdue) g.has_overdue = true;
       if (sentAt && (!g.oldest_unpaid_sent_at || sentAt < g.oldest_unpaid_sent_at)) {
         g.oldest_unpaid_sent_at = sentAt;
       }
     }
 
-    // Also include customers with only initial_balance (no invoices) — optional
+    // Also include customers with a standing balance but no open invoices
     for (const [phone, bal] of balanceMap.entries()) {
       if (groupMap.has(phone)) continue;
-      if ((bal.initial_balance ?? 0) <= 0) continue;
+      if ((bal.current_balance ?? 0) <= 0) continue;
       groupMap.set(phone, {
         phone,
         name: bal.name,
-        initial_balance: bal.initial_balance,
-        invoices_total: 0,
-        total_paid: 0,
-        current_balance: bal.initial_balance,
+        current_balance: bal.current_balance,
         invoices: [],
         has_overdue: false,
         oldest_unpaid_sent_at: null,
@@ -277,7 +284,6 @@ export const listFollowupGroups = createServerFn({ method: "GET" })
 
     const groups: ClientGroup[] = [];
     for (const g of groupMap.values()) {
-      g.current_balance = Math.max(0, g.initial_balance + g.invoices_total - g.total_paid);
       g.invoices.sort((a, b) =>
         (a.sent_at || "").localeCompare(b.sent_at || ""),
       );

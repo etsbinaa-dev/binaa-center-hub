@@ -196,9 +196,6 @@ function AccountsFollowupPage() {
     const parts = [
       `مرحباً ${g.name || ""}،`,
       `تذكير بخصوص حسابكم لدينا:`,
-      g.initial_balance > 0 ? `رصيد سابق: ${fmtMoney(g.initial_balance)} MRO` : "",
-      g.invoices_total > 0 ? `فواتير جديدة: ${fmtMoney(g.invoices_total)} MRO` : "",
-      g.total_paid > 0 ? `المدفوع: ${fmtMoney(g.total_paid)} MRO` : "",
       `الرصيد المستحق: ${fmtMoney(g.current_balance)} MRO`,
       lines,
     ].filter(Boolean);
@@ -214,8 +211,8 @@ function AccountsFollowupPage() {
       return;
     }
     try {
-      await saveBalance({ data: { phone: g.phone, name: g.name, initial_balance: n } });
-      toast.success("تم حفظ رصيد rimsoft");
+      await saveBalance({ data: { phone: g.phone, name: g.name, current_balance: n } });
+      toast.success("تم حفظ الرصيد");
       setEditingBalance((s) => { const c = { ...s }; delete c[g.phone]; return c; });
       reload();
     } catch (e) {
@@ -401,50 +398,39 @@ function AccountsFollowupPage() {
           )}
         </div>
 
-        {/* rimsoft balance editor */}
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <div className="text-muted-foreground">رصيد rimsoft الأولي</div>
+        {/* Current balance card — click to edit */}
+        <div className="rounded-md border-2 border-amber-300 bg-amber-50/60 dark:bg-amber-950/30 p-3 text-center">
+          <div className="text-[11px] text-muted-foreground">الرصيد الحالي المستحق</div>
           {isEditingBalance ? (
-            <div className="flex items-center gap-1">
+            <div className="mt-1 flex items-center justify-center gap-1">
               <input
-                className="w-24 rounded border px-1 py-0.5 text-xs text-center"
+                className="w-32 rounded border px-2 py-1 text-lg text-center font-bold"
                 value={editingBalance[g.phone]}
                 onChange={(e) => setEditingBalance((s) => ({ ...s, [g.phone]: e.target.value }))}
                 inputMode="decimal"
+                autoFocus
               />
-              <button onClick={() => onSaveBalance(g)} className="text-green-600">
-                <Check className="h-3 w-3" />
+              <button onClick={() => onSaveBalance(g)} className="text-green-600" title="حفظ">
+                <Check className="h-5 w-5" />
               </button>
               <button
                 onClick={() => setEditingBalance((s) => { const c = { ...s }; delete c[g.phone]; return c; })}
                 className="text-red-600"
+                title="إلغاء"
               >
-                <X className="h-3 w-3" />
+                <X className="h-5 w-5" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1 font-bold">
-              <span>{fmtMoney(g.initial_balance)} MRO</span>
-              <button
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => setEditingBalance((s) => ({ ...s, [g.phone]: String(g.initial_balance) }))}
-                title="تحديد رصيد rimsoft"
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-            </div>
+            <button
+              type="button"
+              className="mt-1 w-full text-2xl font-bold text-amber-700 dark:text-amber-300 hover:opacity-80"
+              onClick={() => setEditingBalance((s) => ({ ...s, [g.phone]: String(g.current_balance) }))}
+              title="اضغط للتعديل"
+            >
+              {fmtMoney(g.current_balance)} <span className="text-xs">MRO</span>
+            </button>
           )}
-        </div>
-
-        {/* Current balance card */}
-        <div className="rounded-md border-2 border-amber-300 bg-amber-50/60 dark:bg-amber-950/30 p-3 text-center">
-          <div className="text-[11px] text-muted-foreground">الرصيد الحالي المستحق</div>
-          <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-            {fmtMoney(g.current_balance)} <span className="text-xs">MRO</span>
-          </div>
-          <div className="mt-1 text-[10px] text-muted-foreground">
-            rimsoft {fmtMoney(g.initial_balance)} + فواتير {fmtMoney(g.invoices_total)} − مدفوع {fmtMoney(g.total_paid)}
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">

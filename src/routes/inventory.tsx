@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
+import { sendTelegramRaw } from "@/lib/telegram-alert.functions";
 
 const DEFAULT_CRITICAL_THRESHOLD = 5;
 const DEFAULT_LOW_STOCK_THRESHOLD = 50;
@@ -186,6 +187,31 @@ function QuantitiesPage() {
     if (error) toast.error("تعذّر حفظ الكميات");
     else {
       toast.success("تم حفظ الكميات بنجاح");
+      // Fire-and-forget Telegram inventory snapshot
+      try {
+        const allIron = SECTIONS.flatMap((s) =>
+          s.items.map((p) => ({ label: p.label, qty: values[p.key] ?? 0 })),
+        ).sort((a, b) => a.qty - b.qty);
+        const getStatus = (qty: number) =>
+          qty < 10
+            ? { emoji: "🔴", label: "حرج" }
+            : qty < 50
+              ? { emoji: "🟡", label: "منخفض" }
+              : { emoji: "🟢", label: "عادي" };
+        const now = new Intl.DateTimeFormat("ar", {
+          timeZone: "Africa/Nouakchott",
+          dateStyle: "short",
+          timeStyle: "short",
+        }).format(new Date());
+        const lines = allIron.map((item) => {
+          const s = getStatus(item.qty);
+          return `${s.emoji} ${item.label} — ${item.qty} بريكة (${s.label})`;
+        });
+        const tgText = ["📦 تحديث مخزون الحديد", `🕒 ${now}`, "", ...lines].join("\n");
+        void sendTelegramRaw({ data: { text: tgText } }).catch(() => {});
+      } catch {
+        /* ignore */
+      }
       logActivity({ module: "inventory", action: "save", description: "حفظ الكميات اليومية" });
       setPrevious(nextPrev);
       const nowIso = new Date().toISOString();
