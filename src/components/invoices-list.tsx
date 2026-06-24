@@ -129,13 +129,16 @@ export function InvoicesList({ status }: { status: "new" | "sent" }) {
       // أضف مبلغ الفاتورة إلى رصيد العميل في customer_balances
       const { data: invData } = await supabase
         .from("invoices")
-        .select("customer_phone, customer_name, amount")
+        .select("customer_phone, customer_name, amount, printed_ttc")
         .eq("id", inv.id)
         .maybeSingle();
 
-      if (invData?.customer_phone && invData?.amount) {
+      // نستخدم printed_ttc (TTC المطبوع) وليس amount (الذي قد يشمل مبلغ القلم)
+      const ttcToAdd = Number((invData as any)?.printed_ttc ?? (invData as any)?.amount ?? 0);
+
+      if (invData?.customer_phone && ttcToAdd > 0) {
         const phone = invData.customer_phone.trim();
-        const amount = Number(invData.amount ?? 0);
+        const amount = ttcToAdd;
 
         const { data: bal } = await supabase
           .from("customer_balances")
