@@ -118,23 +118,22 @@ function AccountsFollowupPage() {
   const [activeFilter, setActiveFilter] = useState<"all" | "overdue">("all");
 
   async function reload() {
+    const scrollY = window.scrollY;
     const { data: sess } = await supabase.auth.getSession();
     if (!sess.session?.access_token) {
       setGroups([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
     try {
       const r = await fetchList();
       const list = Array.isArray((r as any)?.groups) ? (r as any).groups as ClientGroup[] : [];
       setGroups(list);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: "instant" }));
     } catch (e) {
       logErr("reload", e);
       toast.error(getErrorMessage(e) || "تعذر تحميل البيانات");
       setGroups([]);
-    } finally {
-      setLoading(false);
     }
   }
 
