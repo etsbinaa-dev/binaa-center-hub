@@ -354,16 +354,6 @@ function AccountsFollowupPage() {
             <div className="font-bold text-amber-700 dark:text-amber-300">{fmtMoney(inv.remaining)}</div>
           </div>
         </div>
-        {inv.payment_status !== "paid" && (
-          <div className="flex flex-wrap gap-1">
-            <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onPartialPay(inv)}>
-              دفع جزئي
-            </Button>
-            <Button size="sm" className="h-7 text-[11px]" onClick={() => onFullPay(inv)}>
-              تسديد كامل
-            </Button>
-          </div>
-        )}
       </li>
     );
   };
