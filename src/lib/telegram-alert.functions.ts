@@ -92,3 +92,24 @@ export const sendTelegramAlert = createServerFn({ method: "POST" })
 export const sendTelegramRaw = createServerFn({ method: "POST" })
   .inputValidator((d: { text: string }) => d)
   .handler(async ({ data }) => sendTelegram(data.text));
+
+// ترسل للمدير فقط (TELEGRAM_CHAT_ID) وليس للمجموعة
+export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID ?? "";
+  if (!token || !chatId) return { ok: false };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    });
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export const sendTelegramAdminRaw = createServerFn({ method: "POST" })
+  .inputValidator((d: { text: string }) => d)
+  .handler(async ({ data }) => sendTelegramAdmin(data.text));
