@@ -100,7 +100,7 @@ export const sendTelegramRaw = createServerFn({ method: "POST" })
 // ترسل للمدير فقط (TELEGRAM_CHAT_ID) وليس للمجموعة
 export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID ?? "";
+  const chatId = getAdminChatId();
   if (!token || !chatId) return { ok: false };
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
