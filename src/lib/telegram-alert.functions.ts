@@ -57,7 +57,7 @@ export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: n
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = getChatIds();
   if (!token || chatIds.length === 0) {
-    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID(S)");
+    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS");
     return { ok: false, sent: 0, errors: ["missing_config"] };
   }
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
