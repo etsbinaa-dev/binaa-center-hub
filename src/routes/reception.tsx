@@ -64,6 +64,7 @@ function ReceptionPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
+  const [editRow, setEditRow] = useState<Row | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -109,6 +110,18 @@ function ReceptionPage() {
     setRows((rs) => rs.filter((r) => r.id !== id));
     setToast("تم الحذف");
   };
+
+  const update = async (id: string, payload: Partial<Row>) => {
+    const { error } = await (supabase as any)
+      .from("receptions")
+      .update(payload)
+      .eq("id", id);
+    if (error) return setToast("تعذر التعديل: " + error.message);
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...payload } : r)));
+    setToast("تم التعديل بنجاح");
+    setEditRow(null);
+  };
+
 
   const list = tab === "active" ? active : archived;
 
@@ -206,6 +219,14 @@ function ReceptionPage() {
                 <div className="flex flex-col items-center gap-1">
                   {!r.is_archived ? (
                     <button
+                      onClick={() => setEditRow(r)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-500/10 px-2 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-500/20"
+                    >
+                      ✏️ تعديل
+                    </button>
+                  ) : null}
+                  {!r.is_archived ? (
+                    <button
                       onClick={() => archive(r.id)}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20"
                     >
@@ -240,6 +261,14 @@ function ReceptionPage() {
           }}
           userName={userName}
           userId={userId}
+        />
+      ) : null}
+
+      {editRow ? (
+        <ReceptionEditForm
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSaved={(payload) => update(editRow.id, payload)}
         />
       ) : null}
 
@@ -402,3 +431,84 @@ function ReceptionForm({
     </div>
   );
 }
+
+function ReceptionEditForm({
+  row,
+  onClose,
+  onSaved,
+}: {
+  row: Row;
+  onClose: () => void;
+  onSaved: (payload: Partial<Row>) => void;
+}) {
+  const [supplier, setSupplier] = useState(row.supplier);
+  const [goodsType, setGoodsType] = useState(row.goods_type);
+  const [quantity, setQuantity] = useState(String(row.quantity));
+  const [unit, setUnit] = useState<Unit>(row.unit);
+  const [notes, setNotes] = useState(row.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const qty = Number(quantity);
+    if (!supplier.trim()) return setError("المورد مطلوب");
+    if (!goodsType.trim()) return setError("نوع البضاعة مطلوب");
+    if (!quantity || isNaN(qty) || qty <= 0) return setError("الكمية يجب أن تكون رقماً موجباً");
+    setSaving(true);
+    onSaved({
+      supplier: supplier.trim(),
+      goods_type: goodsType.trim(),
+      quantity: qty,
+      unit,
+      notes: notes.trim() || null,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="w-full max-w-md rounded-t-2xl border border-border bg-card p-4 shadow-xl sm:rounded-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-lg font-extrabold">تعديل سجل الاستقبال</h3>
+          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-muted" aria-label="إغلاق">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-bold">المورد *</label>
+            <input className={inputCls} value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="اسم المورد" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold">نوع البضاعة *</label>
+            <input className={inputCls} value={goodsType} onChange={(e) => setGoodsType(e.target.value)} placeholder="مثال: حديد 12 تركي" />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="mb-1 block text-xs font-bold">الكمية *</label>
+              <input className={inputCls} type="number" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold">الوحدة</label>
+              <select className={inputCls} value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+                <option value="طن">طن</option>
+                <option value="قطعة">قطعة</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold">ملاحظات (اختياري)</label>
+            <textarea className={inputCls} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="أي ملاحظات…" />
+          </div>
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          <button type="submit" disabled={saving} className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-60">
+            {saving ? "جاري الحفظ…" : "حفظ التعديلات"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
