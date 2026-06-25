@@ -111,6 +111,18 @@ function ReceptionPage() {
     setToast("تم الحذف");
   };
 
+  const update = async (id: string, payload: Partial<Row>) => {
+    const { error } = await (supabase as any)
+      .from("receptions")
+      .update(payload)
+      .eq("id", id);
+    if (error) return setToast("تعذر التعديل: " + error.message);
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...payload } : r)));
+    setToast("تم التعديل بنجاح");
+    setEditRow(null);
+  };
+
+
   const list = tab === "active" ? active : archived;
 
   return (
