@@ -21,21 +21,6 @@ const HEADER: Record<TelegramAlertKind, string> = {
   test: "🔔 اختبار الاتصال",
 };
 
-function getChatIds(): string[] {
-  const a = process.env.TELEGRAM_CHAT_IDS ?? "";
-  const b = process.env.TELEGRAM_CHAT_ID ?? "";
-  return [a, b]
-    .join(",")
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-// للمدير فقط (TELEGRAM_CHAT_ID)
-function getAdminChatId(): string {
-  return (process.env.TELEGRAM_CHAT_ID ?? "").trim();
-}
-
 function formatTimestamp(): string {
   try {
     return new Intl.DateTimeFormat("ar", {
@@ -52,25 +37,30 @@ export function escapeMd(s: string): string {
   return s.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, "\\$&");
 }
 
-
-
-export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: number; errors: string[] }> {
+// ─── إرسال للمجموعة فقط (TELEGRAM_CHAT_IDS) ─────────────────────────────
+async function sendToGroup(text: string): Promise<{ ok: boolean; sent: number; errors: string[] }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getChatIds();
-  if (!token || chatIds.length === 0) {
-    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS");
+  const ids = (process.env.TELEGRAM_CHAT_IDS ?? "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!token || ids.length === 0) {
+    console.warn("[telegram-group] missing config");
     return { ok: false, sent: 0, errors: ["missing_config"] };
   }
+
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   let sent = 0;
   const errors: string[] = [];
+
   await Promise.all(
-    chatIds.map(async (chat_id) => {
+    ids.map(async (chat_id) => {
       try {
         const res = await fetch(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ chat_id, text, parse_mode: "MarkdownV2", disable_web_page_preview: true }),
+          body: JSON.stringify({ chat_id, text, disable_web_page_preview: true }),
         });
         if (!res.ok) {
           const body = await res.text();
@@ -83,26 +73,20 @@ export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: n
       }
     }),
   );
-  if (errors.length) console.error("[telegram] errors:", errors);
+
   return { ok: errors.length === 0, sent, errors };
 }
 
-export const sendTelegramAlert = createServerFn({ method: "POST" })
-  .inputValidator((d: { kind: TelegramAlertKind; message: string }) => d)
-  .handler(async ({ data }) => {
-    const text = [HEADER[data.kind] ?? "🔔 إشعار", "", data.message, "", `🕒 ${formatTimestamp()}`].join("\n");
-    return sendTelegram(text);
-  });
-
-export const sendTelegramRaw = createServerFn({ method: "POST" })
-  .inputValidator((d: { text: string }) => d)
-  .handler(async ({ data }) => sendTelegram(data.text));
-
-// ترسل للمدير فقط (TELEGRAM_CHAT_ID) وليس للمجموعة
-export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> {
+// ─── إرسال للمدير فقط (TELEGRAM_CHAT_ID) ────────────────────────────────
+async function sendToAdmin(text: string): Promise<{ ok: boolean }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = getAdminChatId();
-  if (!token || !chatId) return { ok: false };
+  const chatId = (process.env.TELEGRAM_CHAT_ID ?? "").trim();
+
+  if (!token || !chatId) {
+    console.warn("[telegram-admin] missing config");
+    return { ok: false };
+  }
+
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
@@ -115,6 +99,29 @@ export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> 
   }
 }
 
+// ─── للمجموعة (طلبات، استقبال، توصيل) ───────────────────────────────────
+export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: number; errors: string[] }> {
+  return sendToGroup(text);
+}
+
+// ─── للمدير فقط (تقرير يومي، مخزون، متابعة الدفع) ───────────────────────
+export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> {
+  return sendToAdmin(text);
+}
+
+// ─── Server Functions ─────────────────────────────────────────────────────
+
+export const sendTelegramAlert = createServerFn({ method: "POST" })
+  .inputValidator((d: { kind: TelegramAlertKind; message: string }) => d)
+  .handler(async ({ data }) => {
+    const text = [HEADER[data.kind] ?? "🔔 إشعار", "", data.message, "", `🕒 ${formatTimestamp()}`].join("\n");
+    return sendToGroup(text);
+  });
+
+export const sendTelegramRaw = createServerFn({ method: "POST" })
+  .inputValidator((d: { text: string }) => d)
+  .handler(async ({ data }) => sendToGroup(data.text));
+
 export const sendTelegramAdminRaw = createServerFn({ method: "POST" })
   .inputValidator((d: { text: string }) => d)
-  .handler(async ({ data }) => sendTelegramAdmin(data.text));
+  .handler(async ({ data }) => sendToAdmin(data.text));
