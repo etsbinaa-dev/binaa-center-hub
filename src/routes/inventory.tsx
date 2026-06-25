@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notify";
-import { sendTelegramRaw, escapeMd } from "@/lib/telegram-alert.functions";
+import { sendTelegramAdminRaw } from "@/lib/telegram-alert.functions";
 
 const DEFAULT_CRITICAL_THRESHOLD = 5;
 const DEFAULT_LOW_STOCK_THRESHOLD = 50;
@@ -207,39 +207,28 @@ function QuantitiesPage() {
         const low      = allIron.filter((i) => i.qty >= 10 && i.qty < 50);
         const normal   = allIron.filter((i) => i.qty >= 50);
 
-        // monospace row: pad label to 20 chars then qty
-        const row = (label: string, qty: number) => {
-          const padded = label.padEnd(20, " ");
-          return `  ${padded} ${String(qty).padStart(4)} بريكة`;
-        };
-
-        const blockLines: string[] = [];
+        const lines: string[] = [
+          `📦 مخزون الحديد — ${now}`,
+          "",
+        ];
 
         if (critical.length > 0) {
-          blockLines.push("🔴 ـــــ حرج ـــــ");
-          critical.forEach((i) => blockLines.push(row(i.label, i.qty)));
+          lines.push("🔴 حرج:");
+          critical.forEach((i) => lines.push(`• ${i.label}: ${i.qty} بريكة`));
+          lines.push("");
         }
         if (low.length > 0) {
-          blockLines.push("");
-          blockLines.push("🟡 ـــ منخفض ـــ");
-          low.forEach((i) => blockLines.push(row(i.label, i.qty)));
+          lines.push("🟡 منخفض:");
+          low.forEach((i) => lines.push(`• ${i.label}: ${i.qty} بريكة`));
+          lines.push("");
         }
         if (normal.length > 0) {
-          blockLines.push("");
-          blockLines.push("🟢 ـــ عادي ـــــ");
-          normal.forEach((i) => blockLines.push(row(i.label, i.qty)));
+          lines.push("🟢 عادي:");
+          normal.forEach((i) => lines.push(`• ${i.label}: ${i.qty} بريكة`));
         }
 
-        // wrap in monospace code block for telegram
-        const block = "```\n" + blockLines.join("\n") + "\n```";
-
-        const tgText = [
-          `📦 *مخزون الحديد*`,
-          `🕒 ${escapeMd(now)}`,
-          "",
-          block,
-        ].join("\n");
-        void sendTelegramRaw({ data: { text: tgText } }).catch(() => {});
+        const tgText = lines.join("\n");
+        void sendTelegramAdminRaw({ data: { text: tgText } }).catch(() => {});
       } catch {
         /* ignore */
       }
