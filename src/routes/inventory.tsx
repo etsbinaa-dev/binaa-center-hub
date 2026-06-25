@@ -170,7 +170,7 @@ function QuantitiesPage() {
         const newQty = values[p.key];
         const dbQty = currentQty[p.key] ?? 0;
         // only update previous_quantity when the new quantity differs from the saved one
-        const prev = newQty !== dbQty ? dbQty : (currentPrev[p.key] ?? 0);
+        const prev = dbQty;
         nextPrev[p.key] = prev;
         return {
           product_key: p.key,
