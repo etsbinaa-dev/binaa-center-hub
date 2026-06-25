@@ -21,14 +21,18 @@ const HEADER: Record<TelegramAlertKind, string> = {
   test: "🔔 اختبار الاتصال",
 };
 
+// للمجموعة فقط (TELEGRAM_CHAT_IDS)
 function getChatIds(): string[] {
   const a = process.env.TELEGRAM_CHAT_IDS ?? "";
-  const b = process.env.TELEGRAM_CHAT_ID ?? "";
-  return [a, b]
-    .join(",")
+  return a
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+// للمدير فقط (TELEGRAM_CHAT_ID)
+function getAdminChatId(): string {
+  return (process.env.TELEGRAM_CHAT_ID ?? "").trim();
 }
 
 function formatTimestamp(): string {
@@ -53,7 +57,7 @@ export async function sendTelegram(text: string): Promise<{ ok: boolean; sent: n
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = getChatIds();
   if (!token || chatIds.length === 0) {
-    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID(S)");
+    console.warn("[telegram] missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS");
     return { ok: false, sent: 0, errors: ["missing_config"] };
   }
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -96,7 +100,7 @@ export const sendTelegramRaw = createServerFn({ method: "POST" })
 // ترسل للمدير فقط (TELEGRAM_CHAT_ID) وليس للمجموعة
 export async function sendTelegramAdmin(text: string): Promise<{ ok: boolean }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID ?? "";
+  const chatId = getAdminChatId();
   if (!token || !chatId) return { ok: false };
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
