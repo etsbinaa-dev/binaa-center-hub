@@ -219,6 +219,14 @@ function ReceptionPage() {
                 <div className="flex flex-col items-center gap-1">
                   {!r.is_archived ? (
                     <button
+                      onClick={() => setEditRow(r)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-500/10 px-2 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-500/20"
+                    >
+                      ✏️ تعديل
+                    </button>
+                  ) : null}
+                  {!r.is_archived ? (
+                    <button
                       onClick={() => archive(r.id)}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20"
                     >
