@@ -21,10 +21,11 @@ const HEADER: Record<TelegramAlertKind, string> = {
   test: "🔔 اختبار الاتصال",
 };
 
-// للمجموعة فقط (TELEGRAM_CHAT_IDS)
 function getChatIds(): string[] {
   const a = process.env.TELEGRAM_CHAT_IDS ?? "";
-  return a
+  const b = process.env.TELEGRAM_CHAT_ID ?? "";
+  return [a, b]
+    .join(",")
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
