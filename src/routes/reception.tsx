@@ -264,6 +264,14 @@ function ReceptionPage() {
         />
       ) : null}
 
+      {editRow ? (
+        <ReceptionEditForm
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSaved={(payload) => update(editRow.id, payload)}
+        />
+      ) : null}
+
       {toast ? (
         <div className="fixed bottom-20 start-1/2 z-50 -translate-x-1/2 rounded-xl bg-foreground px-4 py-2 text-sm font-bold text-background shadow">
           {toast}
