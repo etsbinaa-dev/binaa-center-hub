@@ -64,6 +64,7 @@ function ReceptionPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
+  const [editRow, setEditRow] = useState<Row | null>(null);
 
   const load = async () => {
     setLoading(true);
