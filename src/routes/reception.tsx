@@ -228,13 +228,13 @@ function ReceptionPage() {
                   {!r.is_archived ? (
                     <button
                       onClick={() => archive(r.id)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20"
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-extrabold text-white hover:bg-emerald-600 shadow-sm"
                     >
-                      <Archive className="h-4 w-4" /> أرشفة
+                      ✅ تم
                     </button>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-                      <Archive className="h-3.5 w-3.5" /> في الأرشيف
+                      ✅ تم
                     </span>
                   )}
                   <button
