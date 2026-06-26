@@ -59,6 +59,7 @@ function Dashboard() {
   const role = useRole().role;
   const isDelivery = role === "delivery";
   const [stats, setStats] = useState<Stats | null>(null);
+  const [showOrder, setShowOrder] = useState(false);
 
   useEffect(() => {
     let alive = true;
