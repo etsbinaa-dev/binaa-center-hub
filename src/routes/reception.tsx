@@ -315,6 +315,7 @@ function ReceptionForm({
       quantity: qty,
       unit,
       notes: notes.trim() || null,
+      image_path: imagePath || null,
       created_by: userId,
       created_by_name: userName,
     };
