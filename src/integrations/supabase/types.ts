@@ -467,6 +467,7 @@ export type Database = {
           images: string[]
           invoiced_at: string | null
           pointeur_name: string | null
+          rimsoft_data: Json | null
           status: Database["public"]["Enums"]["order_status"]
           voice_note: string | null
         }
@@ -487,6 +488,7 @@ export type Database = {
           images?: string[]
           invoiced_at?: string | null
           pointeur_name?: string | null
+          rimsoft_data?: Json | null
           status?: Database["public"]["Enums"]["order_status"]
           voice_note?: string | null
         }
@@ -507,6 +509,7 @@ export type Database = {
           images?: string[]
           invoiced_at?: string | null
           pointeur_name?: string | null
+          rimsoft_data?: Json | null
           status?: Database["public"]["Enums"]["order_status"]
           voice_note?: string | null
         }

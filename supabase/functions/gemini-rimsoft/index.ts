@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json",
 };
 
 const SYSTEM_PROMPT = `You are an assistant for Ets. BINA'A, a construction materials company in Mauritania. Analyze the order text and extract information, returning ONLY a valid JSON object with exactly these 3 keys, nothing else:
@@ -32,32 +33,68 @@ Unit conversions: 1 tonne = 10 bariques. 0.5 barique = half barique. sac stays a
 Do NOT include chantier or location name in products lines.
 Return ONLY the JSON object, no explanation, no markdown.`;
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { details } = await req.json();
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") ?? "",
-        "anthropic-version": "2023-06-01",
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) {
+      return jsonResponse({ error: "GEMINI_API_KEY is not configured" }, 500);
+    }
+
+    const { details } = await req.json().catch(() => ({ details: "" }));
+    const userText = (details ?? "").toString().trim();
+    if (!userText) {
+      return jsonResponse({ error: "Empty order details" }, 400);
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userText }] }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json",
       },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: details }],
-      }),
+    };
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-    const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+
+    const raw = await resp.text();
+    if (!resp.ok) {
+      console.error("[gemini-rimsoft] HTTP", resp.status, raw);
+      let message = `Gemini API error ${resp.status}`;
+      try {
+        const j = JSON.parse(raw);
+        message = j?.error?.message ?? message;
+      } catch { /* ignore */ }
+      return jsonResponse({ error: message }, 502);
+    }
+
+    let data: any = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return jsonResponse({ error: "Invalid JSON from Gemini" }, 502);
+    }
+
+    const text: string =
+      data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
+    if (!text || !text.trim()) {
+      const finish = data?.candidates?.[0]?.finishReason ?? "unknown";
+      return jsonResponse({ error: `Empty response from Gemini (finishReason: ${finish})` }, 502);
+    }
+
+    return jsonResponse({ text });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+    console.error("[gemini-rimsoft] error", e);
+    return jsonResponse({ error: e?.message ?? "Unknown error" }, 500);
   }
 });
