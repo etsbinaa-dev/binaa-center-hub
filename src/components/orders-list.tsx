@@ -237,17 +237,10 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   async function handleRimsoft(o: Order) {
     setRimsoftLoading(o.id);
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: RIMSOFT_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: o.details ?? "" }],
-        }),
+      const { data, error: fnError } = await supabase.functions.invoke("claude-rimsoft", {
+        body: { details: o.details ?? "" },
       });
-      const data = await response.json();
+      if (fnError) throw fnError;
       const text = data.content?.[0]?.text ?? "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
