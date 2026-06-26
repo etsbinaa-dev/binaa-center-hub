@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { OrderDialog } from "@/components/orders-list";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/lib/roles";
 
@@ -58,6 +59,7 @@ function Dashboard() {
   const role = useRole().role;
   const isDelivery = role === "delivery";
   const [stats, setStats] = useState<Stats | null>(null);
+  const [showOrder, setShowOrder] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -146,6 +148,15 @@ function Dashboard() {
         <p className="mt-2 text-sm text-primary-foreground/80">
           نظرة سريعة على نشاط اليوم والتنبيهات الهامة.
         </p>
+        {!isDelivery && (
+          <button
+            onClick={() => setShowOrder(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/20 px-5 py-2.5 text-sm font-bold text-white backdrop-blur hover:bg-white/30 transition-colors"
+          >
+            <PlusCircle className="h-5 w-5" />
+            طلب جديد
+          </button>
+        )}
       </section>
 
       {/* القسم 1: ملخص اليوم */}
@@ -215,6 +226,9 @@ function Dashboard() {
           <QuickAction icon={FileText} label="فرز فاتورة" to="/invoices" />
         </div>
       </section>
+      {showOrder && (
+        <OrderDialog onDone={() => setShowOrder(false)} />
+      )}
     </div>
   );
 }

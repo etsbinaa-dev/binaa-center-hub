@@ -306,7 +306,7 @@ function StatusBadge({ status }: { status: "active" | "archived" }) {
   );
 }
 
-function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order }) {
+export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?: Order }) {
   const qc = useQueryClient();
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
   const isEditing = !!initial;
