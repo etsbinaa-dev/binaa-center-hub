@@ -226,6 +226,9 @@ function Dashboard() {
           <QuickAction icon={FileText} label="فرز فاتورة" to="/invoices" />
         </div>
       </section>
+      {showOrder && (
+        <OrderDialog onDone={() => setShowOrder(false)} />
+      )}
     </div>
   );
 }
