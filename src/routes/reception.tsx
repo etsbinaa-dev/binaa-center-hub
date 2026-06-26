@@ -228,13 +228,13 @@ function ReceptionPage() {
                   {!r.is_archived ? (
                     <button
                       onClick={() => archive(r.id)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20"
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-extrabold text-white hover:bg-emerald-600 shadow-sm"
                     >
-                      <Archive className="h-4 w-4" /> أرشفة
+                      ✅ تم
                     </button>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-                      <Archive className="h-3.5 w-3.5" /> في الأرشيف
+                      ✅ تم
                     </span>
                   )}
                   <button
@@ -297,6 +297,7 @@ function ReceptionForm({
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState<Unit>("طن");
   const [notes, setNotes] = useState("");
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -314,6 +315,7 @@ function ReceptionForm({
       quantity: qty,
       unit,
       notes: notes.trim() || null,
+      image_path: imagePath || null,
       created_by: userId,
       created_by_name: userName,
     };
@@ -394,6 +396,22 @@ function ReceptionForm({
                 <option value="قطعة">قطعة</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold">صورة الفاتورة أو BL (اختياري)</label>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className={inputCls}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const ext = file.name.split(".").pop() || "jpg";
+                const path = `receptions/${Date.now()}.${ext}`;
+                await supabase.storage.from("invoices").upload(path, file, { contentType: file.type });
+                setImagePath(path);
+              }}
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-bold">ملاحظات</label>

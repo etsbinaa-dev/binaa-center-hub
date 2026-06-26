@@ -1,0 +1,1 @@
+ALTER TABLE public.receptions ADD COLUMN IF NOT EXISTS image_path TEXT;

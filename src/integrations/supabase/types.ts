@@ -578,6 +578,7 @@ export type Database = {
           created_by_name: string | null
           goods_type: string
           id: string
+          image_path: string | null
           is_archived: boolean
           notes: string | null
           quantity: number
@@ -590,6 +591,7 @@ export type Database = {
           created_by_name?: string | null
           goods_type: string
           id?: string
+          image_path?: string | null
           is_archived?: boolean
           notes?: string | null
           quantity: number
@@ -602,6 +604,7 @@ export type Database = {
           created_by_name?: string | null
           goods_type?: string
           id?: string
+          image_path?: string | null
           is_archived?: boolean
           notes?: string | null
           quantity?: number
