@@ -398,7 +398,6 @@ function ReceptionForm({
             </div>
           </div>
           <div>
-          <div>
             <label className="mb-1 block text-xs font-bold">صورة الفاتورة أو BL (اختياري)</label>
             <input
               type="file"
