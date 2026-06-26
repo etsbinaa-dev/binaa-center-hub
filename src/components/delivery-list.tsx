@@ -236,9 +236,23 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       </>
                     )}
                     {o.delivery_status === "new" && (
-                      <Button size="sm" variant="secondary" onClick={() => setStartTarget(o)}>
-                        <Truck className="h-4 w-4 ml-1" />بدء التوصيل
-                      </Button>
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => setStartTarget(o)}>
+                          <Truck className="h-4 w-4 ml-1" />بدء التوصيل
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
+                          if (notes === null) return;
+                          const { error } = await supabase
+                            .from("orders")
+                            .update({ delivery_status: "partial", delivery_notes: notes || null })
+                            .eq("id", o.id);
+                          if (error) toast.error(error.message);
+                          else { toast.success("تم تسجيل التسليم الجزئي"); qc.invalidateQueries({ queryKey: ["delivery"] }); }
+                        }}>
+                          <PackageCheck className="h-4 w-4 ml-1" />تسليم جزئي
+                        </Button>
+                      </>
                     )}
                     {o.delivery_status === "in_progress" && (
                       <>
