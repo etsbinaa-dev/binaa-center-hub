@@ -150,16 +150,28 @@ function Dashboard() {
         <p className="mt-2 text-sm text-primary-foreground/80">
           نظرة سريعة على نشاط اليوم والتنبيهات الهامة.
         </p>
-        {!isDelivery && (
-          <button
-            onClick={() => setShowOrder(true)}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/20 px-5 py-2.5 text-sm font-bold text-white backdrop-blur hover:bg-white/30 transition-colors"
-          >
-            <PlusCircle className="h-5 w-5" />
-            طلب جديد
-          </button>
-        )}
       </section>
+
+      {/* بطاقة طلب جديد بارزة */}
+      {!isDelivery && (
+        <section>
+          <button
+            type="button"
+            onClick={() => setShowOrder(true)}
+            className="group flex w-full items-center gap-4 rounded-3xl border-2 border-primary/30 bg-gradient-to-l from-primary to-primary/80 p-5 text-right text-primary-foreground shadow-lg transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-xl sm:gap-6 sm:p-6"
+          >
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 backdrop-blur transition-transform group-hover:scale-110 sm:h-16 sm:w-16">
+              <Plus className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-extrabold sm:text-xl">طلب جديد</div>
+              <div className="mt-1 text-sm text-primary-foreground/85">
+                إنشاء طلب جديد للعميل بسرعة
+              </div>
+            </div>
+          </button>
+        </section>
+      )}
 
       {/* القسم 1: ملخص اليوم */}
       <section>
