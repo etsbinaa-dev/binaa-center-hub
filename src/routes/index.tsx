@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { OrderDialog } from "@/components/orders-list";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/lib/roles";
 
