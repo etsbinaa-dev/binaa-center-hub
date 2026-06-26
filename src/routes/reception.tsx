@@ -297,6 +297,7 @@ function ReceptionForm({
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState<Unit>("طن");
   const [notes, setNotes] = useState("");
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
