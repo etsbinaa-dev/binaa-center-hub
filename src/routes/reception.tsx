@@ -398,6 +398,23 @@ function ReceptionForm({
             </div>
           </div>
           <div>
+          <div>
+            <label className="mb-1 block text-xs font-bold">صورة الفاتورة أو BL (اختياري)</label>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className={inputCls}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const ext = file.name.split(".").pop() || "jpg";
+                const path = `receptions/${Date.now()}.${ext}`;
+                await supabase.storage.from("invoices").upload(path, file, { contentType: file.type });
+                setImagePath(path);
+              }}
+            />
+          </div>
+          <div>
             <label className="mb-1 block text-xs font-bold">ملاحظات</label>
             <textarea
               className={inputCls}
