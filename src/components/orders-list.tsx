@@ -237,19 +237,56 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   async function handleRimsoft(o: Order) {
     setRimsoftLoading(o.id);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("claude-rimsoft", {
+      const { data, error: fnError } = await supabase.functions.invoke("gemini-rimsoft", {
         body: { details: o.details ?? "" },
       });
-      if (fnError) throw fnError;
-      const text = data.content?.[0]?.text ?? "";
+      if (fnError) throw new Error(fnError.message || "Edge function error");
+      if (data?.error) throw new Error(data.error);
+
+      const text = typeof data?.text === "string" ? data.text : "";
+      if (!text.trim()) throw new Error("استجابة فارغة من Gemini");
+
       const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
-      setRimsoftResult({
+      if (!clean) throw new Error("استجابة فارغة من Gemini");
+
+      let parsed: { libelle?: string; products?: string; phone?: string };
+      try {
+        parsed = JSON.parse(clean);
+      } catch {
+        const m = clean.match(/\{[\s\S]*\}/);
+        if (!m) throw new Error("تعذر قراءة JSON من Gemini");
+        parsed = JSON.parse(m[0]);
+      }
+
+      const result = {
         phone: o.customers?.phone ?? "",
         libelle: parsed.libelle ?? "",
         products: parsed.products ?? "",
-      });
+      };
+
+      // Save parsed data to the order and move to Accounting (archived) only on success.
+      const { error: updErr } = await supabase
+        .from("orders")
+        .update({
+          rimsoft_data: { ...result, parsed_at: new Date().toISOString() },
+          status: "archived",
+          invoiced_at: new Date().toISOString(),
+        })
+        .eq("id", o.id);
+      if (updErr) throw new Error(updErr.message);
+
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["count", "orders"] });
+
+      setRimsoftResult(result);
       setRimsoftOrder(o);
+      toast.success("تم التحويل للمحاسبة ✓");
+      fireTelegram(notifyTelegram, "invoiced", o);
+      logActivity({
+        module: "orders",
+        action: "archive",
+        description: `تحويل طلب العميل ${o.customers?.name ?? "—"} للمحاسبة (RIMSoft)`,
+      });
     } catch (e: any) {
       toast.error("فشل تحليل الطلب: " + (e?.message ?? "خطأ غير معروف"));
     } finally {
