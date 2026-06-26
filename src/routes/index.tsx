@@ -148,6 +148,15 @@ function Dashboard() {
         <p className="mt-2 text-sm text-primary-foreground/80">
           نظرة سريعة على نشاط اليوم والتنبيهات الهامة.
         </p>
+        {!isDelivery && (
+          <button
+            onClick={() => setShowOrder(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/20 px-5 py-2.5 text-sm font-bold text-white backdrop-blur hover:bg-white/30 transition-colors"
+          >
+            <PlusCircle className="h-5 w-5" />
+            طلب جديد
+          </button>
+        )}
       </section>
 
       {/* القسم 1: ملخص اليوم */}
