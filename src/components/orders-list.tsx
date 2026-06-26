@@ -8,8 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Plus, CheckCircle2, Trash2, Phone, Clock, ChevronDown, Pencil, Archive, RotateCcw, Contact } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Search,
+  Plus,
+  CheckCircle2,
+  Trash2,
+  Phone,
+  Clock,
+  ChevronDown,
+  Pencil,
+  Archive,
+  RotateCcw,
+  Contact,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -48,7 +70,11 @@ async function fireTelegram(
 }
 
 type Order = {
-  id: string; details: string | null; status: "active" | "archived"; created_at: string; invoiced_at: string | null;
+  id: string;
+  details: string | null;
+  status: "active" | "archived";
+  created_at: string;
+  invoiced_at: string | null;
   customer_id: string;
   images: string[] | null;
   files: string[] | null;
@@ -96,6 +122,33 @@ async function uploadAttachments(customerId: string, atts: LocalAttachments) {
   return { imagePaths, voicePath, filePaths };
 }
 
+const RIMSOFT_SYSTEM_PROMPT = `You are an assistant for Ets. BINA'A, a construction materials company in Mauritania. Analyze the order text and extract information, returning ONLY a valid JSON object with exactly these 3 keys, nothing else:
+{"libelle": "the chantier or location name found in the text, or empty string if none", "products": "the RIMSoft clipboard lines, one per product, format: CODE,DESIGNATION,0,QUANTITY,0", "phone": ""}
+
+For products, use this product list to match by code:
+P0001 CIMENT 42.5, P0002 CIMENT 32.5, P0003 CIMENT ANTISEL SR, P0003s CIMENT ANTISEL PM, P0004 PLATER MAMCO TAIBA, P0005 PLATER ATLANTIC, P0006 FILASSE, P0006s FILASSE PAR KG, P0007 FIL DE FER, P0008 POINTE, P0009 PLATER SAMIA, P052 PLATER SAMIA, P0010 ZAZOU L2 par kg, P0010s L4, P0010c ZAZOU par metre, P0011 FER 12 CHEMALI, P0012 FER 10 CHEMALI, P0013 FER 12 TURKEY, P0014 FER 10 TURKEY, P0015 FER 12 CHINE, P0016 FER 10 CHINE, P0017 FER 8, p01147 FER 8 Turkey, P0022 FER 14 CHEMALI, P0023 BAR 8, P0024 BRIQUE 15, P0024S BRIQUE 20 P, P0024SS BRIQUE 15P, P4141 BRIQUE 20 CRE, P0025 ORDI, P00301 BAR 10 TURKEY, P0027 BAR 14 CHEMALI, P0027S BAR 14 TURK, P0028 BAR 4.5, P0029 BAR 5.5, P0030 BAR 10 CHEMALI, p0032 CONTRE PLAC 8MM, P01a1 CONTRE PLAC 15, P0033 FER 12 ALGERIE, P0034 GRAVIER CRBLE PAR TONNE, P00341 GRAVIER CONCSER PAR TONNE, P0044 SABLE, P0045 COQUILLAGE, P0046 EAU, POO47 TUBE 9 INJELEC, P0048 TUBE 11 IJELEC, P0049 FER 4.2, P0050 FER 6 PLEIN, P05214 FER 5 PLEIN, P0051 FER 16, P0051s FER 16 ALG, P0512 FER 16 TURKEY, P0051B BAR 16, P0014Q FLICONT, P0014Q2 FLICONT 20 KG, P0020s FER 4.7, p0100 PLATR SOMIP, P0053 POINTE AC, P0055 ETANCHEITE TAPIS GUEDRON 3M, P0055S ETANCHEITE TAPIS GUEDRON 4MM, P0056 COLLE GUEDRON, P0057 FIL 1.5, P0058 FIL 2.5, P0060 SMCI 30KG, P0061 SMCI 25KG, P0062 SMCI 20KG, P0063 A L'HUIL SMCI 20KG, P0064 CARREAU, P0064S FER 20, P00152 BAR 20, P0065 CARREAU SOL, P055 CIMENT 52.5, P0066 COLORANT, p0125 CABLE 3X1.5, P00091 FER 14 ALGERIE, P00991t FER 14 TURKEY, P0014A FER 10 ALGERIE, P00992 FER 14 CHINE, P0339 CIMENT BLANC 25 KG, p00145 BAR 6 P, P001247 ENDUI, P001247s ENDUI GOLD, P02415 ENDUI SMCI, P0021s FER 4.5, P00524 BERWETT, P012S1 SURJOINT, P012S3 COFREE 24, P01C5 COFREE 12, p021145 CABLE 2X25, P0197 COLLE CARREAU MR, P0197S COLLE CARREAU TURQUE, P01121 COLLE GREFIER 30 KG ATLAS, p0124 PAPIER SABLE, P00143 BOITIER ROUGE, P00415 CABLE CUIVRE 4X16, P05241 PLANCHE MC, p01204 CHEVRON, P012004 DULIAN GM, P01210 DULIAN, P03214 PEL, PTRSP TRANSPORT, P0101 FER 12 MR, P02141 FER 10 MR, P10001 BACHE L'EAU 5 TN, P01354 BACHE 7/5, P013544 BACHE 6/5, P013544s BACHE 4/5, P01354sq BACHE 4/3, P02100 BACH 10TN, P101 SEAU MACON GM, P101S SEAU MACON M, P101SS SEAU MACON, P101SSS SEAU PLATER, p10241 SIKA 1KG, p10241s SIKA LIQUID 5L, P00991 TALOUCHE, 40026 BAR 12 CHEMALI, 40026S BAR 12 TURK, P0000 PRODUIT VIDE.
+
+DEFAULT RULES when origin/brand not specified:
+- FER 12 / حديد 12 without brand → P0011 FER 12 CHEMALI
+- FER 10 / حديد 10 without brand → P0012 FER 10 CHEMALI
+- FER 14 / حديد 14 without brand → P0022 FER 14 CHEMALI
+- PLATER / جبس without brand → P0005 PLATER ATLANTIC
+- CIMENT / سيمان without grade → P0001 CIMENT 42.5
+- GRAVIER / حصى without type → P0034 GRAVIER CRBLE PAR TONNE
+
+BRAND KEYWORDS:
+- شمالي / chemali → CHEMALI
+- تركي / turkey / turk → TURKEY
+- صيني / chine → CHINE
+- جزائري / algerie / alg → ALGERIE
+- أطلنتيك / atlantic → ATLANTIC
+- مامكو / mamco → MAMCO TAIBA
+- سامية / samia → SAMIA
+
+Unit conversions: 1 tonne = 10 bariques. 0.5 barique = half barique. sac stays as SAC. kg stays as KG.
+Do NOT include chantier or location name in products lines.
+Return ONLY the JSON object, no explanation, no markdown.`;
+
 export function OrdersList({ status }: { status: "active" | "archived" }) {
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
@@ -104,7 +157,17 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   const [editing, setEditing] = useState<Order | null>(null);
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
 
-  const { data: orders = [], isLoading, isError, error } = useQuery<Order[], Error>({
+  // RIMSoft state
+  const [rimsoftOrder, setRimsoftOrder] = useState<Order | null>(null);
+  const [rimsoftLoading, setRimsoftLoading] = useState<string | null>(null);
+  const [rimsoftResult, setRimsoftResult] = useState<{ phone: string; libelle: string; products: string } | null>(null);
+
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<Order[], Error>({
     queryKey: ["orders", status, search],
     refetchOnMount: "always",
     staleTime: 0,
@@ -118,16 +181,17 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
       const list = (data as Order[]) ?? [];
       if (!search.trim()) return list;
       const s = search.toLowerCase();
-      return list.filter(o => o.customers?.name.toLowerCase().includes(s) || o.customers?.phone.includes(s));
+      return list.filter((o) => o.customers?.name.toLowerCase().includes(s) || o.customers?.phone.includes(s));
     },
   });
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, nextStatus }: { id: string; nextStatus: "active" | "archived" }) => {
       const order = orders.find((o) => o.id === id);
-      const patch = nextStatus === "archived"
-        ? { status: nextStatus, invoiced_at: new Date().toISOString() }
-        : { status: nextStatus, invoiced_at: null };
+      const patch =
+        nextStatus === "archived"
+          ? { status: nextStatus, invoiced_at: new Date().toISOString() }
+          : { status: nextStatus, invoiced_at: null };
       const { error } = await supabase.from("orders").update(patch).eq("id", id);
       if (error) throw error;
       return { order, nextStatus };
@@ -141,9 +205,10 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
       logActivity({
         module: "orders",
         action: nextStatus === "archived" ? "archive" : "restore",
-        description: nextStatus === "archived"
-          ? `أرشفة طلب العميل ${cname} (تمت الفوترة)`
-          : `استعادة طلب العميل ${cname} من الأرشيف`,
+        description:
+          nextStatus === "archived"
+            ? `أرشفة طلب العميل ${cname} (تمت الفوترة)`
+            : `استعادة طلب العميل ${cname} من الأرشيف`,
       });
     },
     onError: (e: any) => toast.error(e.message),
@@ -169,6 +234,36 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
     onError: (e: any) => toast.error(e.message),
   });
 
+  async function handleRimsoft(o: Order) {
+    setRimsoftLoading(o.id);
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: RIMSOFT_SYSTEM_PROMPT,
+          messages: [{ role: "user", content: o.details ?? "" }],
+        }),
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text ?? "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setRimsoftResult({
+        phone: o.customers?.phone ?? "",
+        libelle: parsed.libelle ?? "",
+        products: parsed.products ?? "",
+      });
+      setRimsoftOrder(o);
+    } catch (e: any) {
+      toast.error("فشل تحليل الطلب: " + (e?.message ?? "خطأ غير معروف"));
+    } finally {
+      setRimsoftLoading(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -179,20 +274,111 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
         {status === "active" && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 ml-1" />طلب جديد</Button>
+              <Button size="sm">
+                <Plus className="h-4 w-4 ml-1" />
+                طلب جديد
+              </Button>
             </DialogTrigger>
             <OrderDialog onDone={() => setOpen(false)} />
           </Dialog>
         )}
       </div>
 
-      <Dialog open={!!editing} onOpenChange={(nextOpen) => { if (!nextOpen) setEditing(null); }}>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setEditing(null);
+        }}
+      >
         {editing && <OrderDialog initial={editing} onDone={() => setEditing(null)} />}
+      </Dialog>
+
+      {/* RIMSoft Dialog */}
+      <Dialog
+        open={!!rimsoftOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRimsoftOrder(null);
+            setRimsoftResult(null);
+          }
+        }}
+      >
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>🧾 تحويل للمحاسبة — RIMSoft</DialogTitle>
+            <p className="text-sm text-muted-foreground">{rimsoftOrder?.customers?.name}</p>
+          </DialogHeader>
+          {rimsoftResult && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">📞 رقم الهاتف — Client</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted rounded px-3 py-2 text-sm font-mono" dir="ltr">
+                    {rimsoftResult.phone}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(rimsoftResult.phone);
+                      toast.success("تم النسخ ✓");
+                    }}
+                  >
+                    نسخ
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">🏗️ Libellé — وصف الفاتورة</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-muted rounded px-3 py-2 text-sm">{rimsoftResult.libelle || "—"}</code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(rimsoftResult.libelle);
+                      toast.success("تم النسخ ✓");
+                    }}
+                  >
+                    نسخ
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  📋 المنتجات — الصق في "Coller liste en mémoire"
+                </p>
+                <div className="flex flex-col gap-2">
+                  <pre className="bg-muted rounded px-3 py-2 text-sm font-mono whitespace-pre-wrap" dir="ltr">
+                    {rimsoftResult.products}
+                  </pre>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => {
+                      navigator.clipboard.writeText(rimsoftResult.products);
+                      toast.success("تم النسخ ✓");
+                    }}
+                  >
+                    نسخ المنتجات
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
       </Dialog>
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف" className="pr-10" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ابحث بالاسم أو الهاتف"
+          className="pr-10"
+        />
       </div>
 
       {isLoading ? (
@@ -209,7 +395,8 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
                 <div className="min-w-0">
                   <p className="font-semibold truncate">{o.customers?.name ?? "—"}</p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5" dir="ltr">
-                    <Phone className="h-3 w-3" />{o.customers?.phone}
+                    <Phone className="h-3 w-3" />
+                    {o.customers?.phone}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
@@ -218,9 +405,15 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
                     <Clock className="h-3 w-3" />
                     {status === "archived" && o.invoiced_at ? (
                       <span>
-                        {new Date(o.invoiced_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
-                        {" "}
-                        {new Date(o.invoiced_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                        {new Date(o.invoiced_at).toLocaleDateString("ar-EG-u-nu-latn", {
+                          day: "numeric",
+                          month: "short",
+                        })}{" "}
+                        {new Date(o.invoiced_at).toLocaleTimeString("ar-EG-u-nu-latn", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}
                       </span>
                     ) : (
                       new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })
@@ -251,23 +444,44 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
               )}
               <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
               <div className="flex justify-end gap-2 pt-1">
+                <Button size="sm" variant="outline" disabled={rimsoftLoading === o.id} onClick={() => handleRimsoft(o)}>
+                  {rimsoftLoading === o.id ? (
+                    <span className="h-4 w-4 ml-1 animate-spin inline-block border-2 border-current border-t-transparent rounded-full" />
+                  ) : (
+                    <span className="ml-1">🧾</span>
+                  )}
+                  تحويل للمحاسبة
+                </Button>
                 {status === "active" && (
-                  <Button size="sm" variant="default" onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "archived" })}>
-                    <CheckCircle2 className="h-4 w-4 ml-1" />تم الفوترة
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "archived" })}
+                  >
+                    <CheckCircle2 className="h-4 w-4 ml-1" />
+                    تم الفوترة
                   </Button>
                 )}
                 {status === "archived" && (
-                  <Button size="sm" variant="secondary" onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "active" })}>
-                    <RotateCcw className="h-4 w-4 ml-1" />إرجاع
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => updateStatus.mutate({ id: o.id, nextStatus: "active" })}
+                  >
+                    <RotateCcw className="h-4 w-4 ml-1" />
+                    إرجاع
                   </Button>
                 )}
                 <Button size="sm" variant="outline" onClick={() => setEditing(o)}>
-                  <Pencil className="h-4 w-4 ml-1" />تعديل
+                  <Pencil className="h-4 w-4 ml-1" />
+                  تعديل
                 </Button>
                 {isAdmin && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="ghost" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent dir="rtl">
                       <AlertDialogHeader>
@@ -294,14 +508,16 @@ function StatusBadge({ status }: { status: "active" | "archived" }) {
   if (status === "archived") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-muted bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-        <Archive className="h-3 w-3" />مؤرشف
+        <Archive className="h-3 w-3" />
+        مؤرشف
       </span>
     );
   }
 
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-      <CheckCircle2 className="h-3 w-3" />نشط
+      <CheckCircle2 className="h-3 w-3" />
+      نشط
     </span>
   );
 }
@@ -311,7 +527,9 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
   const isEditing = !!initial;
   const [customerId, setCustomerId] = useState<string | null>(initial?.customer_id ?? null);
-  const [customerLabel, setCustomerLabel] = useState(initial?.customers ? `${initial.customers.name} — ${initial.customers.phone}` : "");
+  const [customerLabel, setCustomerLabel] = useState(
+    initial?.customers ? `${initial.customers.name} — ${initial.customers.phone}` : "",
+  );
   const [details, setDetails] = useState(initial?.details ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -332,12 +550,16 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
   const filtered = useMemo(() => {
     if (!search.trim()) return customers;
     const s = search.toLowerCase();
-    return customers.filter(c => c.name.toLowerCase().includes(s) || c.phone.includes(s));
+    return customers.filter((c) => c.name.toLowerCase().includes(s) || c.phone.includes(s));
   }, [customers, search]);
 
   const createCustomer = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.from("customers").insert({ name: newName, phone: newPhone }).select().single();
+      const { data, error } = await supabase
+        .from("customers")
+        .insert({ name: newName, phone: newPhone })
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },
@@ -347,7 +569,8 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
       qc.invalidateQueries({ queryKey: ["count", "customers"] });
       setCustomerId(c.id);
       setCustomerLabel(`${c.name} — ${c.phone}`);
-      setNewName(""); setNewPhone("");
+      setNewName("");
+      setNewPhone("");
       toast.success("تمت إضافة العميل");
     },
     onError: (e: any) => toast.error(e.message),
@@ -384,20 +607,30 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
       }
 
       if (!cid) throw new Error("اختر عميلاً أو أدخل الاسم والهاتف");
-      const hasExistingAttachments = !!initial && Boolean(initial.images?.length || initial.voice_note || initial.files?.length);
-      if (!details.trim() && attachments.images.length === 0 && !attachments.voice && attachments.files.length === 0 && !hasExistingAttachments) {
+      const hasExistingAttachments =
+        !!initial && Boolean(initial.images?.length || initial.voice_note || initial.files?.length);
+      if (
+        !details.trim() &&
+        attachments.images.length === 0 &&
+        !attachments.voice &&
+        attachments.files.length === 0 &&
+        !hasExistingAttachments
+      ) {
         throw new Error("أضف تفاصيل أو صورة أو تسجيلاً صوتياً أو ملفاً");
       }
       const { imagePaths, voicePath, filePaths } = await uploadAttachments(cid, attachments);
 
       if (initial) {
-        const { error } = await supabase.from("orders").update({
-          customer_id: cid,
-          details: details.trim() ? details : null,
-          images: [...(initial.images ?? []), ...imagePaths],
-          voice_note: voicePath ?? initial.voice_note,
-          files: [...(initial.files ?? []), ...filePaths],
-        }).eq("id", initial.id);
+        const { error } = await supabase
+          .from("orders")
+          .update({
+            customer_id: cid,
+            details: details.trim() ? details : null,
+            images: [...(initial.images ?? []), ...imagePaths],
+            voice_note: voicePath ?? initial.voice_note,
+            files: [...(initial.files ?? []), ...filePaths],
+          })
+          .eq("id", initial.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("orders").insert({
@@ -422,18 +655,17 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
       logActivity({
         module: "orders",
         action: initial ? "update" : "create",
-        description: initial
-          ? `تعديل طلب العميل ${info.name}`
-          : `إنشاء طلب جديد للعميل ${info.name}`,
+        description: initial ? `تعديل طلب العميل ${info.name}` : `إنشاء طلب جديد للعميل ${info.name}`,
       });
       onDone();
     },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const contactPickerSupported = typeof window !== "undefined"
-    && "contacts" in navigator
-    && typeof (navigator as any).contacts?.select === "function";
+  const contactPickerSupported =
+    typeof window !== "undefined" &&
+    "contacts" in navigator &&
+    typeof (navigator as any).contacts?.select === "function";
 
   async function pickFromContacts() {
     if (!contactPickerSupported) {
@@ -473,11 +705,18 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
     }
   }
 
-
   return (
     <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>{isEditing ? "تعديل الطلب" : "طلب جديد"}</DialogTitle></DialogHeader>
-      <form onSubmit={(e) => { e.preventDefault(); createOrder.mutate(); }} className="space-y-4">
+      <DialogHeader>
+        <DialogTitle>{isEditing ? "تعديل الطلب" : "طلب جديد"}</DialogTitle>
+      </DialogHeader>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          createOrder.mutate();
+        }}
+        className="space-y-4"
+      >
         <div className="space-y-2">
           <Label>العميل</Label>
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
@@ -493,10 +732,19 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
                 <CommandList>
                   <CommandEmpty>لا نتائج</CommandEmpty>
                   <CommandGroup>
-                    {filtered.map(c => (
-                      <CommandItem key={c.id} onSelect={() => { setCustomerId(c.id); setCustomerLabel(`${c.name} — ${c.phone}`); setPickerOpen(false); }}>
+                    {filtered.map((c) => (
+                      <CommandItem
+                        key={c.id}
+                        onSelect={() => {
+                          setCustomerId(c.id);
+                          setCustomerLabel(`${c.name} — ${c.phone}`);
+                          setPickerOpen(false);
+                        }}
+                      >
                         <span className="truncate">{c.name}</span>
-                        <span className="text-xs text-muted-foreground mr-auto" dir="ltr">{c.phone}</span>
+                        <span className="text-xs text-muted-foreground mr-auto" dir="ltr">
+                          {c.phone}
+                        </span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -510,7 +758,8 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">عميل جديد؟ أدخل بياناته أو اختره من جهات الاتصال</p>
             <Button type="button" variant="outline" size="sm" onClick={pickFromContacts} className="shrink-0">
-              <Contact className="h-4 w-4 ml-1" />جهات الاتصال
+              <Contact className="h-4 w-4 ml-1" />
+              جهات الاتصال
             </Button>
           </div>
           {contactsUnavailable && (
@@ -520,22 +769,54 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="flex gap-2">
-              <Input placeholder="الاسم" value={newName} onChange={(e) => { setNewName(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} className="flex-1" />
+              <Input
+                placeholder="الاسم"
+                value={newName}
+                onChange={(e) => {
+                  setNewName(e.target.value);
+                  if (customerId) {
+                    setCustomerId(null);
+                    setCustomerLabel("");
+                  }
+                }}
+                className="flex-1"
+              />
             </div>
-            <Input placeholder="الهاتف" value={newPhone} onChange={(e) => { setNewPhone(e.target.value); if (customerId) { setCustomerId(null); setCustomerLabel(""); } }} dir="ltr" />
+            <Input
+              placeholder="الهاتف"
+              value={newPhone}
+              onChange={(e) => {
+                setNewPhone(e.target.value);
+                if (customerId) {
+                  setCustomerId(null);
+                  setCustomerLabel("");
+                }
+              }}
+              dir="ltr"
+            />
           </div>
-          <Button type="button" variant="secondary" size="sm" className="w-full"
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full"
             disabled={!newName || !newPhone || createCustomer.isPending}
-            onClick={() => createCustomer.mutate()}>
-            <Plus className="h-4 w-4 ml-1" />حفظ كعميل الآن (اختياري)
+            onClick={() => createCustomer.mutate()}
+          >
+            <Plus className="h-4 w-4 ml-1" />
+            حفظ كعميل الآن (اختياري)
           </Button>
           <p className="text-[11px] text-muted-foreground">إن لم تحفظه الآن، سيتم حفظه تلقائياً عند حفظ الطلب.</p>
         </div>
 
-
         <div className="space-y-2">
           <Label>تفاصيل الطلب</Label>
-          <Textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={4} placeholder="اكتب تفاصيل الطلب…" />
+          <Textarea
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={4}
+            placeholder="اكتب تفاصيل الطلب…"
+          />
           <p className="text-[11px] text-muted-foreground">يمكنك الاكتفاء بالنص أو الصور أو التسجيل الصوتي</p>
         </div>
 
@@ -550,7 +831,10 @@ export function OrderDialog({ onDone, initial }: { onDone: () => void; initial?:
         </div>
 
         <DialogFooter>
-          <Button type="submit" disabled={createOrder.isPending || (!customerId && !(newName.trim() && newPhone.trim()))}>
+          <Button
+            type="submit"
+            disabled={createOrder.isPending || (!customerId && !(newName.trim() && newPhone.trim()))}
+          >
             {createOrder.isPending ? "جارٍ الحفظ…" : "حفظ الطلب"}
           </Button>
         </DialogFooter>
