@@ -186,7 +186,7 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                   </div>
                 </div>
                 {o.details && o.details.trim() && (
-                  <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2">{o.details}</p>
+                  <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2" dir="auto">{o.details}</p>
                 )}
                 <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
 
