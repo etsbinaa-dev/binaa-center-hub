@@ -426,9 +426,15 @@ function ReceptionForm({
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const ext = file.name.split(".").pop() || "jpg";
-                const path = `receptions/${Date.now()}.${ext}`;
-                await supabase.storage.from("receptions").upload(path, file, { contentType: file.type });
+                const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+                const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+                const { error: upErr } = await supabase.storage
+                  .from("receptions")
+                  .upload(path, file, { contentType: file.type, upsert: false });
+                if (upErr) {
+                  setError("تعذر رفع الملف: " + upErr.message);
+                  return;
+                }
                 setImagePath(path);
               }}
             />
