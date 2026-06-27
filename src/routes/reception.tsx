@@ -219,7 +219,7 @@ function ReceptionPage() {
                           .from("receptions")
                           .createSignedUrl((r as any).image_path, 60 * 60);
                         if (error || !data?.signedUrl) {
-                          toast.error("تعذر فتح الملف");
+                          setToast("تعذر فتح الملف");
                           return;
                         }
                         window.open(data.signedUrl, "_blank", "noopener,noreferrer");
