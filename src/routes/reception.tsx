@@ -215,11 +215,13 @@ function ReceptionPage() {
                     <button
                       type="button"
                       onClick={async () => {
+                        const path = String((r as any).image_path || "").replace(/^\/+/, "");
                         const { data, error } = await supabase.storage
                           .from("receptions")
-                          .createSignedUrl((r as any).image_path, 60 * 60);
+                          .createSignedUrl(path, 3600);
                         if (error || !data?.signedUrl) {
-                          setToast("تعذر فتح الملف");
+                          console.error("[reception:signedUrl]", error, "path:", path);
+                          setToast("تعذر فتح الملف: " + (error?.message || "رابط غير صالح"));
                           return;
                         }
                         window.open(data.signedUrl, "_blank", "noopener,noreferrer");
