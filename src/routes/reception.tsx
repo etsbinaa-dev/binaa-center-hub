@@ -426,7 +426,7 @@ function ReceptionForm({
                 if (!file) return;
                 const ext = file.name.split(".").pop() || "jpg";
                 const path = `receptions/${Date.now()}.${ext}`;
-                await supabase.storage.from("invoices").upload(path, file, { contentType: file.type });
+                await supabase.storage.from("receptions").upload(path, file, { contentType: file.type });
                 setImagePath(path);
               }}
             />
