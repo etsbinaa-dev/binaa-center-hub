@@ -215,11 +215,13 @@ function ReceptionPage() {
                     <button
                       type="button"
                       onClick={async () => {
+                        const path = String((r as any).image_path || "").replace(/^\/+/, "");
                         const { data, error } = await supabase.storage
                           .from("receptions")
-                          .createSignedUrl((r as any).image_path, 60 * 60);
+                          .createSignedUrl(path, 3600);
                         if (error || !data?.signedUrl) {
-                          setToast("تعذر فتح الملف");
+                          console.error("[reception:signedUrl]", error, "path:", path);
+                          setToast("تعذر فتح الملف: " + (error?.message || "رابط غير صالح"));
                           return;
                         }
                         window.open(data.signedUrl, "_blank", "noopener,noreferrer");
@@ -424,9 +426,15 @@ function ReceptionForm({
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const ext = file.name.split(".").pop() || "jpg";
-                const path = `receptions/${Date.now()}.${ext}`;
-                await supabase.storage.from("receptions").upload(path, file, { contentType: file.type });
+                const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+                const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+                const { error: upErr } = await supabase.storage
+                  .from("receptions")
+                  .upload(path, file, { contentType: file.type, upsert: false });
+                if (upErr) {
+                  setError("تعذر رفع الملف: " + upErr.message);
+                  return;
+                }
                 setImagePath(path);
               }}
             />
