@@ -212,14 +212,22 @@ function ReceptionPage() {
                     </p>
                   ) : null}
                   {(r as any).image_path ? (
-                    <a
-                      href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/invoices/${(r as any).image_path}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { data, error } = await supabase.storage
+                          .from("receptions")
+                          .createSignedUrl((r as any).image_path, 60 * 60);
+                        if (error || !data?.signedUrl) {
+                          toast.error("تعذر فتح الملف");
+                          return;
+                        }
+                        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                      }}
                       className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
                       📎 عرض الفاتورة / BL
-                    </a>
+                    </button>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>🕒 {formatDateTime(r.created_at)}</span>
