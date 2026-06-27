@@ -211,6 +211,16 @@ function ReceptionPage() {
                       {r.notes}
                     </p>
                   ) : null}
+                  {(r as any).image_path ? (
+                    <a
+                      href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/invoices/${(r as any).image_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      📎 عرض الفاتورة / BL
+                    </a>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>🕒 {formatDateTime(r.created_at)}</span>
                     {r.created_by_name ? <span>🧑‍💼 {r.created_by_name}</span> : null}
