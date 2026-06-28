@@ -7,6 +7,7 @@ type Output = {
   customer_phone: string | null;
   invoice_number: string | null;
   amount: number | null;
+  printed_ttc: number | null;
   raw_text: string;
   error?: string;
 };
@@ -57,22 +58,15 @@ Client {رقم_حساب} {اسم_العميل} {رقم_واتساب} /f {رقم_
 - handwritten_confidence: "high" إذا كان واضحاً، "medium" مع شك بسيط، "low" إذا غير واضح (وفي هذه الحالة اجعل handwritten_amount = null).
 - تجاهل الأختام والتواقيع والشعارات.`;
 
-// Pull the 8-digit Mauritanian whatsapp number that appears IMMEDIATELY before "/f"
-// inside the Client line. Falls back to any [234]\d{7} in that line if /f is missing.
 function extractMauritanianPhoneFromClientLine(rawText: string): string | null {
   if (!rawText) return null;
   const lines = rawText.split(/\r?\n/);
   const clientLine = lines.find((l) => /^\s*(client|العميل)\b/i.test(l));
   if (!clientLine) return null;
-
-  // Preferred: digits right before "/f"
   const beforeF = clientLine.match(/(\+?222)?\s*([234]\d{7})\s*\/\s*f\b/i);
   if (beforeF) return beforeF[2];
-
-  // Fallback: last [234]\d{7} on the line (whatsapp is after the name, before /f)
   const all = clientLine.match(/(?<!\d)([234]\d{7})(?!\d)/g);
   if (all && all.length > 0) return all[all.length - 1];
-
   return null;
 }
 
@@ -130,6 +124,7 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         customer_phone: null,
         invoice_number: null,
         amount: null,
+        printed_ttc: null,
         raw_text: "",
         error: "LOVABLE_API_KEY is not configured",
       };
@@ -171,6 +166,7 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         customer_phone: null,
         invoice_number: null,
         amount: null,
+        printed_ttc: null,
         raw_text: "",
         error: `AI gateway error ${res.status}`,
       };
@@ -227,6 +223,7 @@ export const extractInvoiceFields = createServerFn({ method: "POST" })
         (parsed.invoice_number as string | undefined)?.toString().trim() ||
         null,
       amount,
+      printed_ttc: ttc,
       raw_text,
     };
   });
