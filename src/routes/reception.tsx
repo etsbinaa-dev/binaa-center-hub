@@ -54,7 +54,7 @@ function formatDateTime(iso: string) {
 }
 
 function ReceptionPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const userName =
     (user?.user_metadata?.full_name as string | undefined) || user?.email || "مستخدم";
   const userId = user?.id ?? null;
@@ -257,13 +257,15 @@ function ReceptionPage() {
                       ✅ تم
                     </span>
                   )}
-                  <button
-                    onClick={() => remove(r.id)}
-                    className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
-                    aria-label="حذف"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {isAdmin ? (
+                    <button
+                      onClick={() => remove(r.id)}
+                      className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
+                      aria-label="حذف"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </li>
