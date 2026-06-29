@@ -54,7 +54,7 @@ function formatDateTime(iso: string) {
 }
 
 function ReceptionPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const userName =
     (user?.user_metadata?.full_name as string | undefined) || user?.email || "مستخدم";
   const userId = user?.id ?? null;
