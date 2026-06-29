@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Search,
   Phone,
@@ -70,12 +65,19 @@ function fmtDateTime(s: string | null, latn = false) {
 
 export function DeliveryList({ view }: { view: "active" | "archive" }) {
   const qc = useQueryClient();
+  const { role } = useAuth();
+  const canSeePhone = role === "admin" || role === "accountant";
   const [search, setSearch] = useState("");
   const [startTarget, setStartTarget] = useState<DeliveryOrder | null>(null);
   const [locationOrderId, setLocationOrderId] = useState<string | null>(null);
   const [locationDraft, setLocationDraft] = useState({ lat: "", lng: "", notes: "" });
 
-  const { data: orders = [], isLoading, isError, error } = useQuery<DeliveryOrder[], Error>({
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<DeliveryOrder[], Error>({
     queryKey: ["delivery", view, search],
     refetchOnMount: "always",
     staleTime: 0,
@@ -92,12 +94,8 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
       if (error) throw error;
       const list = (data as unknown as DeliveryOrder[]) ?? [];
       list.sort((a, b) => {
-        const aTime = view === "archive"
-          ? (a.delivered_at || a.created_at)
-          : (a.delivery_started_at || a.created_at);
-        const bTime = view === "archive"
-          ? (b.delivered_at || b.created_at)
-          : (b.delivery_started_at || b.created_at);
+        const aTime = view === "archive" ? a.delivered_at || a.created_at : a.delivery_started_at || a.created_at;
+        const bTime = view === "archive" ? b.delivered_at || b.created_at : b.delivery_started_at || b.created_at;
         return new Date(bTime).getTime() - new Date(aTime).getTime();
       });
       if (!search.trim()) return list;
@@ -143,7 +141,12 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
 
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف أو رقم الفاتورة" className="pr-10" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ابحث بالاسم أو الهاتف أو رقم الفاتورة"
+          className="pr-10"
+        />
       </div>
 
       {isLoading ? (
@@ -158,15 +161,15 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
         <div className="space-y-2">
           {orders.map((o) => {
             const phone = normalizePhone(o.customers?.phone ?? "");
-            const showDispatch =
-              o.delivery_status === "in_progress" || o.delivery_status === "delivered";
+            const showDispatch = o.delivery_status === "in_progress" || o.delivery_status === "delivered";
             return (
               <Card key={o.id} className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold truncate">{o.customers?.name ?? "—"}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5" dir="ltr">
-                      <Phone className="h-3 w-3" />{o.customers?.phone}
+                      <Phone className="h-3 w-3" />
+                      {canSeePhone ? o.customers?.phone : "••••••••"}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
@@ -175,9 +178,15 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       <Clock className="h-3 w-3" />
                       {view === "archive" && o.delivered_at ? (
                         <span>
-                          {new Date(o.delivered_at).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" })}
-                          {" "}
-                          {new Date(o.delivered_at).toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                          {new Date(o.delivered_at).toLocaleDateString("ar-EG-u-nu-latn", {
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          {new Date(o.delivered_at).toLocaleTimeString("ar-EG-u-nu-latn", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          })}
                         </span>
                       ) : (
                         new Date(o.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })
@@ -186,7 +195,9 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                   </div>
                 </div>
                 {o.details && o.details.trim() && (
-                  <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2" dir="auto">{o.details}</p>
+                  <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2" dir="auto">
+                    {o.details}
+                  </p>
                 )}
                 <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
 
@@ -200,17 +211,19 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                       <span className="text-muted-foreground">رقم الفاتورة:</span>
                       <span className="font-medium">{o.delivery_invoice_number ?? "—"}</span>
                       <span className="text-muted-foreground">بدء التوصيل:</span>
-                      <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivery_started_at, view === "archive")}</span>
+                      <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>
+                        {fmtDateTime(o.delivery_started_at, view === "archive")}
+                      </span>
                       {o.delivery_status === "delivered" && (
                         <>
                           <span className="text-muted-foreground">تم التسليم:</span>
-                          <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>{fmtDateTime(o.delivered_at, view === "archive")}</span>
+                          <span className="font-medium" dir={view === "archive" ? "ltr" : undefined}>
+                            {fmtDateTime(o.delivered_at, view === "archive")}
+                          </span>
                         </>
                       )}
                     </div>
-                    {o.delivery_notes && (
-                      <p className="whitespace-pre-wrap pt-1">📝 {o.delivery_notes}</p>
-                    )}
+                    {o.delivery_notes && <p className="whitespace-pre-wrap pt-1">📝 {o.delivery_notes}</p>}
                     {o.delivery_invoice_path && (
                       <div className="pt-1">
                         <OrderAttachmentsView images={null} voice={null} files={[o.delivery_invoice_path]} />
@@ -221,16 +234,18 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
 
                 {view === "active" && (
                   <div className="flex flex-wrap justify-end gap-2 pt-1">
-                    {phone && (
+                    {phone && canSeePhone && (
                       <>
                         <Button asChild size="sm" variant="outline">
                           <a href={`https://wa.me/${phone.replace(/^\+/, "")}`} target="_blank" rel="noreferrer">
-                            <MessageCircle className="h-4 w-4 ml-1" />واتساب
+                            <MessageCircle className="h-4 w-4 ml-1" />
+                            واتساب
                           </a>
                         </Button>
                         <Button asChild size="sm" variant="outline">
                           <a href={`tel:${phone}`}>
-                            <Phone className="h-4 w-4 ml-1" />اتصال
+                            <Phone className="h-4 w-4 ml-1" />
+                            اتصال
                           </a>
                         </Button>
                       </>
@@ -238,89 +253,137 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                     {o.delivery_status === "new" && (
                       <>
                         <Button size="sm" variant="secondary" onClick={() => setStartTarget(o)}>
-                          <Truck className="h-4 w-4 ml-1" />بدء التوصيل
+                          <Truck className="h-4 w-4 ml-1" />
+                          بدء التوصيل
                         </Button>
-                        <Button size="sm" variant="outline" onClick={async () => {
-                          const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
-                          if (notes === null) return;
-                          const { error } = await supabase
-                            .from("orders")
-                            .update({ delivery_status: "partial", delivery_notes: notes || null })
-                            .eq("id", o.id);
-                          if (error) toast.error(error.message);
-                          else { toast.success("تم تسجيل التسليم الجزئي"); qc.invalidateQueries({ queryKey: ["delivery"] }); }
-                        }}>
-                          <PackageCheck className="h-4 w-4 ml-1" />تسليم جزئي
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
+                            if (notes === null) return;
+                            const { error } = await supabase
+                              .from("orders")
+                              .update({ delivery_status: "partial", delivery_notes: notes || null })
+                              .eq("id", o.id);
+                            if (error) toast.error(error.message);
+                            else {
+                              toast.success("تم تسجيل التسليم الجزئي");
+                              qc.invalidateQueries({ queryKey: ["delivery"] });
+                            }
+                          }}
+                        >
+                          <PackageCheck className="h-4 w-4 ml-1" />
+                          تسليم جزئي
                         </Button>
                       </>
                     )}
                     {o.delivery_status === "in_progress" && (
                       <>
-                        <Button size="sm" variant="outline" onClick={async () => {
-                          const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
-                          if (notes === null) return;
-                          const { error } = await supabase
-                            .from("orders")
-                            .update({ delivery_status: "partial", delivery_notes: notes || null })
-                            .eq("id", o.id);
-                          if (error) toast.error(error.message);
-                          else { toast.success("تم تسجيل التسليم الجزئي"); qc.invalidateQueries({ queryKey: ["delivery"] }); }
-                        }}>
-                          <PackageCheck className="h-4 w-4 ml-1" />تسليم جزئي
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            const notes = window.prompt("ملاحظة عن الجزء المسلّم (اختياري):");
+                            if (notes === null) return;
+                            const { error } = await supabase
+                              .from("orders")
+                              .update({ delivery_status: "partial", delivery_notes: notes || null })
+                              .eq("id", o.id);
+                            if (error) toast.error(error.message);
+                            else {
+                              toast.success("تم تسجيل التسليم الجزئي");
+                              qc.invalidateQueries({ queryKey: ["delivery"] });
+                            }
+                          }}
+                        >
+                          <PackageCheck className="h-4 w-4 ml-1" />
+                          تسليم جزئي
                         </Button>
                         <Button size="sm" variant="default" onClick={() => completeDelivery.mutate(o.id)}>
-                          <PackageCheck className="h-4 w-4 ml-1" />تم التسليم
+                          <PackageCheck className="h-4 w-4 ml-1" />
+                          تم التسليم
                         </Button>
                       </>
                     )}
                     {o.delivery_status === "partial" && (
                       <>
-                        <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">📦 جزئي</span>
+                        <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
+                          📦 جزئي
+                        </span>
                         <Button size="sm" variant="default" onClick={() => completeDelivery.mutate(o.id)}>
-                          <PackageCheck className="h-4 w-4 ml-1" />تم التسليم كاملاً
+                          <PackageCheck className="h-4 w-4 ml-1" />
+                          تم التسليم كاملاً
                         </Button>
                       </>
                     )}
-                    {o.customers?.id && (
-                      locationOrderId === o.id ? (
+                    {o.customers?.id &&
+                      (locationOrderId === o.id ? (
                         <div className="w-full border rounded-lg p-2 space-y-2 text-xs mt-1">
                           <div className="font-bold text-center">📍 موقع العميل</div>
                           <div className="flex gap-1">
-                            <input className="flex-1 rounded border px-2 py-1 text-xs" placeholder="Latitude" dir="ltr"
+                            <input
+                              className="flex-1 rounded border px-2 py-1 text-xs"
+                              placeholder="Latitude"
+                              dir="ltr"
                               value={locationDraft.lat}
-                              onChange={(e) => setLocationDraft((s) => ({ ...s, lat: e.target.value }))} />
-                            <input className="flex-1 rounded border px-2 py-1 text-xs" placeholder="Longitude" dir="ltr"
+                              onChange={(e) => setLocationDraft((s) => ({ ...s, lat: e.target.value }))}
+                            />
+                            <input
+                              className="flex-1 rounded border px-2 py-1 text-xs"
+                              placeholder="Longitude"
+                              dir="ltr"
                               value={locationDraft.lng}
-                              onChange={(e) => setLocationDraft((s) => ({ ...s, lng: e.target.value }))} />
+                              onChange={(e) => setLocationDraft((s) => ({ ...s, lng: e.target.value }))}
+                            />
                           </div>
-                          <input className="w-full rounded border px-2 py-1 text-xs" placeholder="ملاحظة (اختياري)"
+                          <input
+                            className="w-full rounded border px-2 py-1 text-xs"
+                            placeholder="ملاحظة (اختياري)"
                             value={locationDraft.notes}
-                            onChange={(e) => setLocationDraft((s) => ({ ...s, notes: e.target.value }))} />
+                            onChange={(e) => setLocationDraft((s) => ({ ...s, notes: e.target.value }))}
+                          />
                           <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="outline" onClick={() => setLocationOrderId(null)}>إلغاء</Button>
-                            <Button size="sm" onClick={async () => {
-                              const lat = Number(locationDraft.lat);
-                              const lng = Number(locationDraft.lng);
-                              if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error("إحداثيات غير صالحة"); return; }
-                              await supabase.from("customers").update({
-                                location_lat: lat,
-                                location_lng: lng,
-                                location_notes: locationDraft.notes || null,
-                              }).eq("id", o.customers!.id);
-                              toast.success("تم حفظ موقع العميل ✅");
-                              setLocationOrderId(null);
-                            }}>حفظ</Button>
+                            <Button size="sm" variant="outline" onClick={() => setLocationOrderId(null)}>
+                              إلغاء
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                const lat = Number(locationDraft.lat);
+                                const lng = Number(locationDraft.lng);
+                                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                                  toast.error("إحداثيات غير صالحة");
+                                  return;
+                                }
+                                await supabase
+                                  .from("customers")
+                                  .update({
+                                    location_lat: lat,
+                                    location_lng: lng,
+                                    location_notes: locationDraft.notes || null,
+                                  })
+                                  .eq("id", o.customers!.id);
+                                toast.success("تم حفظ موقع العميل ✅");
+                                setLocationOrderId(null);
+                              }}
+                            >
+                              حفظ
+                            </Button>
                           </div>
                         </div>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => {
-                          setLocationOrderId(o.id);
-                          setLocationDraft({ lat: "", lng: "", notes: "" });
-                        }}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setLocationOrderId(o.id);
+                            setLocationDraft({ lat: "", lng: "", notes: "" });
+                          }}
+                        >
                           📍 حفظ موقع العميل
                         </Button>
-                      )
-                    )}
+                      ))}
                   </div>
                 )}
               </Card>
@@ -429,25 +492,44 @@ function StartDeliveryDialog({
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="dlv-driver" className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5" />اسم السائق <span className="text-destructive">*</span>
+              <User className="h-3.5 w-3.5" />
+              اسم السائق <span className="text-destructive">*</span>
             </Label>
-            <Input id="dlv-driver" value={driver} onChange={(e) => setDriver(e.target.value)} placeholder="مثال: محمد" />
+            <Input
+              id="dlv-driver"
+              value={driver}
+              onChange={(e) => setDriver(e.target.value)}
+              placeholder="مثال: محمد"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dlv-pointeur" className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5" />اسم المشرف <span className="text-destructive">*</span>
+              <User className="h-3.5 w-3.5" />
+              اسم المشرف <span className="text-destructive">*</span>
             </Label>
-            <Input id="dlv-pointeur" value={pointeur} onChange={(e) => setPointeur(e.target.value)} placeholder="مثال: علي" />
+            <Input
+              id="dlv-pointeur"
+              value={pointeur}
+              onChange={(e) => setPointeur(e.target.value)}
+              placeholder="مثال: علي"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="dlv-invnum" className="flex items-center gap-1">
-              <FileText className="h-3.5 w-3.5" />رقم الفاتورة
+              <FileText className="h-3.5 w-3.5" />
+              رقم الفاتورة
             </Label>
-            <Input id="dlv-invnum" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="مثال: 26T03001" />
+            <Input
+              id="dlv-invnum"
+              value={invoiceNumber}
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+              placeholder="مثال: 26T03001"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1">
-              <Paperclip className="h-3.5 w-3.5" />نسخة الفاتورة (صورة أو PDF) <span className="text-destructive">*</span>
+              <Paperclip className="h-3.5 w-3.5" />
+              نسخة الفاتورة (صورة أو PDF) <span className="text-destructive">*</span>
             </Label>
             <Input
               type="file"
@@ -470,7 +552,9 @@ function StartDeliveryDialog({
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>إلغاء</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            إلغاء
+          </Button>
           <Button onClick={submit} disabled={busy}>
             <Truck className="h-4 w-4 ml-1" />
             {busy ? "جاري البدء…" : "بدء التوصيل"}
@@ -485,20 +569,23 @@ function DeliveryBadge({ status }: { status: DeliveryStatus }) {
   if (status === "delivered") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-muted bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-        <CheckCircle2 className="h-3 w-3" />تم التسليم
+        <CheckCircle2 className="h-3 w-3" />
+        تم التسليم
       </span>
     );
   }
   if (status === "in_progress") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-        <Truck className="h-3 w-3" />جاري التوصيل
+        <Truck className="h-3 w-3" />
+        جاري التوصيل
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-      <Truck className="h-3 w-3" />جديد
+      <Truck className="h-3 w-3" />
+      جديد
     </span>
   );
 }
