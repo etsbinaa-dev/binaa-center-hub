@@ -42,6 +42,7 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   accounts_followup: "متابعة الدفع",
   daily_payments: "الصندوق والمتابعة المؤقتة",
   reception: "الاستقبال",
+  driver_wages: "مستحقات السائقين",
   settings: "الإعدادات",
 };
 

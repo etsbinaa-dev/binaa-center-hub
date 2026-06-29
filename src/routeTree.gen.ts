@@ -18,6 +18,7 @@ import { Route as PermissionsRouteImport } from './routes/permissions'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as InventoryRouteImport } from './routes/inventory'
+import { Route as DriverWagesRouteImport } from './routes/driver-wages'
 import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as DailyPaymentsRouteImport } from './routes/daily-payments'
 import { Route as CustomersRouteImport } from './routes/customers'
@@ -74,6 +75,11 @@ const InvoicesRoute = InvoicesRouteImport.update({
 const InventoryRoute = InventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverWagesRoute = DriverWagesRouteImport.update({
+  id: '/driver-wages',
+  path: '/driver-wages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeliveryRoute = DeliveryRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRoute
   '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
+  '/driver-wages': typeof DriverWagesRoute
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersRoute
   '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
+  '/driver-wages': typeof DriverWagesRoute
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRoute
   '/daily-payments': typeof DailyPaymentsRoute
   '/delivery': typeof DeliveryRouteWithChildren
+  '/driver-wages': typeof DriverWagesRoute
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/daily-payments'
     | '/delivery'
+    | '/driver-wages'
     | '/inventory'
     | '/invoices'
     | '/orders'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/daily-payments'
     | '/delivery'
+    | '/driver-wages'
     | '/inventory'
     | '/invoices'
     | '/orders'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/daily-payments'
     | '/delivery'
+    | '/driver-wages'
     | '/inventory'
     | '/invoices'
     | '/orders'
@@ -289,6 +301,7 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRoute
   DailyPaymentsRoute: typeof DailyPaymentsRoute
   DeliveryRoute: typeof DeliveryRouteWithChildren
+  DriverWagesRoute: typeof DriverWagesRoute
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
@@ -365,6 +378,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/inventory'
       preLoaderRoute: typeof InventoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver-wages': {
+      id: '/driver-wages'
+      path: '/driver-wages'
+      fullPath: '/driver-wages'
+      preLoaderRoute: typeof DriverWagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/delivery': {
@@ -497,6 +517,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersRoute: CustomersRoute,
   DailyPaymentsRoute: DailyPaymentsRoute,
   DeliveryRoute: DeliveryRouteWithChildren,
+  DriverWagesRoute: DriverWagesRoute,
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
