@@ -247,7 +247,9 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
       setRimsoftResult({
         phone: o.customers?.phone ?? "",
         libelle: parsed.libelle ?? "",
-        products: (parsed.products ?? "").replace(/\r\n|\r/g, "\n").trim(),
+        products: String(parsed.products ?? "")
+          .replace(/\r\n|\r/g, "\n")
+          .trim(),
       });
       setRimsoftOrder(o);
     } catch (e: any) {
