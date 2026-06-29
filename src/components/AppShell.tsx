@@ -42,6 +42,7 @@ const NAV: NavItem[] = [
   { key: "reception", label: "الاستقبال", to: "/reception", icon: Inbox },
   { key: "invoices", label: "فرز وإرسال", to: "/invoices", icon: Receipt },
   { key: "delivery", label: "التوصيل", to: "/delivery", icon: Truck },
+  { key: "driver_wages", label: "مستحقات السائقين", to: "/driver-wages", icon: Truck },
   { key: "inventory", label: "الكميات", to: "/inventory", icon: Package },
   { key: "customers", label: "العملاء", to: "/customers", icon: User },
   { key: "users", label: "المستخدمون", to: "/users", icon: Users },
