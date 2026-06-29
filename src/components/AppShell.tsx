@@ -92,7 +92,7 @@ export function AppShell({
     permsLoaded ? hasPermission(matrix, role, m, "view") : canAccess(role, m);
 
   const allowed = canView(moduleKey);
-  const items = NAV.filter((n) => canView(n.key));
+  const items = NAV.filter((n) => n.key === "driver_wages" ? (role === "admin" || role === "accountant") : canView(n.key));
 
 
   return (
