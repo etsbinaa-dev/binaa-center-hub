@@ -74,7 +74,9 @@ serve(async (req) => {
       try {
         const j = JSON.parse(raw);
         message = j?.error?.message ?? message;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       return jsonResponse({ error: message }, 502);
     }
 
@@ -85,14 +87,15 @@ serve(async (req) => {
       return jsonResponse({ error: "Invalid JSON from Gemini" }, 502);
     }
 
-    const text: string =
-      data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
+    const text: string = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
     if (!text || !text.trim()) {
       const finish = data?.candidates?.[0]?.finishReason ?? "unknown";
       return jsonResponse({ error: `Empty response from Gemini (finishReason: ${finish})` }, 502);
     }
 
-    return jsonResponse({ text });
+    // Fix line endings for RIMSoft (Windows expects \r\n)
+    const fixedText = text.replace(/\\r\\n|\\r|\\n/g, "\r\n");
+    return jsonResponse({ text: fixedText });
   } catch (e: any) {
     console.error("[gemini-rimsoft] error", e);
     return jsonResponse({ error: e?.message ?? "Unknown error" }, 500);
