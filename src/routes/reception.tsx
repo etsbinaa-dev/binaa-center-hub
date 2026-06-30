@@ -29,7 +29,10 @@ type Row = {
   created_by_name: string | null;
   created_at: string;
   is_archived: boolean;
+  brought_by_driver?: boolean | null;
+  driver_name?: string | null;
 };
+
 
 type TabKind = "active" | "archive";
 
@@ -234,7 +237,11 @@ function ReceptionPage() {
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>🕒 {formatDateTime(r.created_at)}</span>
                     {r.created_by_name ? <span>🧑‍💼 {r.created_by_name}</span> : null}
+                    {r.brought_by_driver ? (
+                      <span>🚚 {r.driver_name || "سائق"}</span>
+                    ) : null}
                   </div>
+
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   {!r.is_archived ? (
@@ -320,8 +327,21 @@ function ReceptionForm({
   const [unit, setUnit] = useState<Unit>("طن");
   const [notes, setNotes] = useState("");
   const [imagePath, setImagePath] = useState<string | null>(null);
+  const [broughtByDriver, setBroughtByDriver] = useState(false);
+  const [driverName, setDriverName] = useState("");
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("drivers")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (data) setDrivers(data as { id: string; name: string }[]);
+    })();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,6 +350,7 @@ function ReceptionForm({
     if (!supplier.trim()) return setError("المورد مطلوب");
     if (!goodsType.trim()) return setError("نوع البضاعة مطلوب");
     if (!quantity || isNaN(qty) || qty <= 0) return setError("الكمية يجب أن تكون رقماً موجباً");
+    if (broughtByDriver && !driverName.trim()) return setError("اختر السائق");
     setSaving(true);
     const payload = {
       supplier: supplier.trim(),
@@ -338,6 +359,8 @@ function ReceptionForm({
       unit,
       notes: notes.trim() || null,
       image_path: imagePath || null,
+      brought_by_driver: broughtByDriver,
+      driver_name: broughtByDriver ? driverName.trim() : null,
       created_by: userId,
       created_by_name: userName,
     };
@@ -359,6 +382,7 @@ function ReceptionForm({
     }).catch((e) => console.error("[reception:notify]", e));
     onCreated(data as Row);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
@@ -441,7 +465,42 @@ function ReceptionForm({
               }}
             />
           </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="broughtByDriver"
+                checked={broughtByDriver}
+                onChange={(e) => {
+                  setBroughtByDriver(e.target.checked);
+                  if (!e.target.checked) setDriverName("");
+                }}
+                className="h-4 w-4"
+              />
+              <label htmlFor="broughtByDriver" className="text-sm font-bold">
+                أحضرها سائق
+              </label>
+            </div>
+            {broughtByDriver ? (
+              <div>
+                <label className="mb-1 block text-xs font-bold">السائق *</label>
+                <select
+                  className={inputCls}
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  required={broughtByDriver}
+                >
+                  <option value="">اختر السائق</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+          </div>
+
           <div>
+
             <label className="mb-1 block text-xs font-bold">ملاحظات</label>
             <textarea
               className={inputCls}
@@ -492,8 +551,21 @@ function ReceptionEditForm({
   const [quantity, setQuantity] = useState(String(row.quantity));
   const [unit, setUnit] = useState<Unit>(row.unit);
   const [notes, setNotes] = useState(row.notes ?? "");
+  const [broughtByDriver, setBroughtByDriver] = useState(!!row.brought_by_driver);
+  const [driverName, setDriverName] = useState(row.driver_name ?? "");
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("drivers")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (data) setDrivers(data as { id: string; name: string }[]);
+    })();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -502,6 +574,7 @@ function ReceptionEditForm({
     if (!supplier.trim()) return setError("المورد مطلوب");
     if (!goodsType.trim()) return setError("نوع البضاعة مطلوب");
     if (!quantity || isNaN(qty) || qty <= 0) return setError("الكمية يجب أن تكون رقماً موجباً");
+    if (broughtByDriver && !driverName.trim()) return setError("اختر السائق");
     setSaving(true);
     onSaved({
       supplier: supplier.trim(),
@@ -509,9 +582,12 @@ function ReceptionEditForm({
       quantity: qty,
       unit,
       notes: notes.trim() || null,
+      brought_by_driver: broughtByDriver,
+      driver_name: broughtByDriver ? driverName.trim() : null,
     });
     setSaving(false);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
@@ -544,7 +620,44 @@ function ReceptionEditForm({
               </select>
             </div>
           </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="editBroughtByDriver"
+                checked={broughtByDriver}
+                onChange={(e) => {
+                  setBroughtByDriver(e.target.checked);
+                  if (!e.target.checked) setDriverName("");
+                }}
+                className="h-4 w-4"
+              />
+              <label htmlFor="editBroughtByDriver" className="text-sm font-bold">
+                أحضرها سائق
+              </label>
+            </div>
+            {broughtByDriver ? (
+              <div>
+                <label className="mb-1 block text-xs font-bold">السائق *</label>
+                <select
+                  className={inputCls}
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  required={broughtByDriver}
+                >
+                  <option value="">اختر السائق</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                  {driverName && !drivers.some((d) => d.name === driverName) ? (
+                    <option value={driverName}>{driverName}</option>
+                  ) : null}
+                </select>
+              </div>
+            ) : null}
+          </div>
           <div>
+
             <label className="mb-1 block text-xs font-bold">ملاحظات (اختياري)</label>
             <textarea className={inputCls} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="أي ملاحظات…" />
           </div>

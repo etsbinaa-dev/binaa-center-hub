@@ -603,6 +603,7 @@ export type Database = {
       }
       receptions: {
         Row: {
+          brought_by_driver: boolean
           created_at: string
           created_by: string | null
           created_by_name: string | null
@@ -617,6 +618,7 @@ export type Database = {
           unit: string
         }
         Insert: {
+          brought_by_driver?: boolean
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
@@ -631,6 +633,7 @@ export type Database = {
           unit: string
         }
         Update: {
+          brought_by_driver?: boolean
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
