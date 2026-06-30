@@ -40,7 +40,6 @@ serve(async (req) => {
       return jsonResponse({ ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
     const body = {
       systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: "user", parts: [{ text: userText }] }],
@@ -50,24 +49,39 @@ serve(async (req) => {
       },
     };
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    let resp: Response | null = null;
+    let raw = "";
+    let lastErr = "";
+    let lastStatus = 0;
 
-    const raw = await resp.text();
-    if (!resp.ok) {
-      console.error("[gemini-driver-wages] HTTP", resp.status, raw);
-      let message = `Gemini API error ${resp.status}`;
-      try {
-        const j = JSON.parse(raw);
-        message = j?.error?.message ?? message;
-      } catch {
-        /* ignore */
+    outer: for (const model of models) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        raw = await resp.text();
+        if (resp.ok) break outer;
+        lastErr = raw;
+        lastStatus = resp.status;
+        console.error(`[gemini-driver-wages] ${model} attempt ${attempt + 1} HTTP ${resp.status}`);
+        if (resp.status !== 503 && resp.status !== 429 && resp.status !== 500) break;
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
       }
+    }
+
+    if (!resp || !resp.ok) {
+      let message = `Gemini API error ${lastStatus}`;
+      try {
+        const j = JSON.parse(lastErr);
+        message = j?.error?.message ?? message;
+      } catch { /* ignore */ }
       return jsonResponse({ error: message }, 502);
     }
+
 
     let data: any = null;
     try {
