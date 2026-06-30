@@ -551,8 +551,21 @@ function ReceptionEditForm({
   const [quantity, setQuantity] = useState(String(row.quantity));
   const [unit, setUnit] = useState<Unit>(row.unit);
   const [notes, setNotes] = useState(row.notes ?? "");
+  const [broughtByDriver, setBroughtByDriver] = useState(!!row.brought_by_driver);
+  const [driverName, setDriverName] = useState(row.driver_name ?? "");
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("drivers")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (data) setDrivers(data as { id: string; name: string }[]);
+    })();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -561,6 +574,7 @@ function ReceptionEditForm({
     if (!supplier.trim()) return setError("المورد مطلوب");
     if (!goodsType.trim()) return setError("نوع البضاعة مطلوب");
     if (!quantity || isNaN(qty) || qty <= 0) return setError("الكمية يجب أن تكون رقماً موجباً");
+    if (broughtByDriver && !driverName.trim()) return setError("اختر السائق");
     setSaving(true);
     onSaved({
       supplier: supplier.trim(),
@@ -568,9 +582,12 @@ function ReceptionEditForm({
       quantity: qty,
       unit,
       notes: notes.trim() || null,
+      brought_by_driver: broughtByDriver,
+      driver_name: broughtByDriver ? driverName.trim() : null,
     });
     setSaving(false);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
