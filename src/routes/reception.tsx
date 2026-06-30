@@ -327,8 +327,21 @@ function ReceptionForm({
   const [unit, setUnit] = useState<Unit>("طن");
   const [notes, setNotes] = useState("");
   const [imagePath, setImagePath] = useState<string | null>(null);
+  const [broughtByDriver, setBroughtByDriver] = useState(false);
+  const [driverName, setDriverName] = useState("");
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("drivers")
+        .select("id,name")
+        .order("name", { ascending: true });
+      if (data) setDrivers(data as { id: string; name: string }[]);
+    })();
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,6 +350,7 @@ function ReceptionForm({
     if (!supplier.trim()) return setError("المورد مطلوب");
     if (!goodsType.trim()) return setError("نوع البضاعة مطلوب");
     if (!quantity || isNaN(qty) || qty <= 0) return setError("الكمية يجب أن تكون رقماً موجباً");
+    if (broughtByDriver && !driverName.trim()) return setError("اختر السائق");
     setSaving(true);
     const payload = {
       supplier: supplier.trim(),
@@ -345,6 +359,8 @@ function ReceptionForm({
       unit,
       notes: notes.trim() || null,
       image_path: imagePath || null,
+      brought_by_driver: broughtByDriver,
+      driver_name: broughtByDriver ? driverName.trim() : null,
       created_by: userId,
       created_by_name: userName,
     };
@@ -366,6 +382,7 @@ function ReceptionForm({
     }).catch((e) => console.error("[reception:notify]", e));
     onCreated(data as Row);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
