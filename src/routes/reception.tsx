@@ -237,7 +237,11 @@ function ReceptionPage() {
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     <span>🕒 {formatDateTime(r.created_at)}</span>
                     {r.created_by_name ? <span>🧑‍💼 {r.created_by_name}</span> : null}
+                    {r.brought_by_driver ? (
+                      <span>🚚 {r.driver_name || "سائق"}</span>
+                    ) : null}
                   </div>
+
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   {!r.is_archived ? (
