@@ -29,23 +29,17 @@ async function analyzeOrders(
   const combined = orders.map((o) => o.details).filter(Boolean).join("\n---\n");
   if (!combined.trim()) return { ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 };
 
-  const { data, error } = await supabase.functions.invoke("gemini-rimsoft", {
+  const { data, error } = await supabase.functions.invoke("gemini-driver-wages", {
     body: { details: combined },
   });
   if (error) throw error;
+  if (data?.error) throw new Error(data.error);
 
-  const text: string = data?.text ?? "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  try {
-    const parsed = JSON.parse(clean);
-    return {
-      ciment_tonnes: Number(parsed.ciment_tonnes ?? 0),
-      barigs: Number(parsed.barigs ?? 0),
-      fer_tonnes: Number(parsed.fer_tonnes ?? 0),
-    };
-  } catch {
-    return { ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 };
-  }
+  return {
+    ciment_tonnes: Number(data?.ciment_tonnes ?? 0),
+    barigs: Number(data?.barigs ?? 0),
+    fer_tonnes: Number(data?.fer_tonnes ?? 0),
+  };
 }
 
 export function DriverWages() {
