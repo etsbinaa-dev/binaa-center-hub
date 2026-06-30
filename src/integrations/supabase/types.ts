@@ -277,6 +277,33 @@ export type Database = {
         }
         Relationships: []
       }
+      drivers: {
+        Row: {
+          barig_rate: number
+          ciment_rate: number
+          created_at: string
+          fer_rate: number
+          id: string
+          name: string
+        }
+        Insert: {
+          barig_rate?: number
+          ciment_rate?: number
+          created_at?: string
+          fer_rate?: number
+          id?: string
+          name: string
+        }
+        Update: {
+          barig_rate?: number
+          ciment_rate?: number
+          created_at?: string
+          fer_rate?: number
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       house_cash_ops: {
         Row: {
           amount: number
@@ -579,6 +606,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           created_by_name: string | null
+          driver_name: string | null
           goods_type: string
           id: string
           image_path: string | null
@@ -592,6 +620,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          driver_name?: string | null
           goods_type: string
           id?: string
           image_path?: string | null
@@ -605,6 +634,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          driver_name?: string | null
           goods_type?: string
           id?: string
           image_path?: string | null
