@@ -497,8 +497,10 @@ function ReceptionForm({
                 </select>
               </div>
             ) : null}
+          </div>
 
           <div>
+
             <label className="mb-1 block text-xs font-bold">ملاحظات</label>
             <textarea
               className={inputCls}
