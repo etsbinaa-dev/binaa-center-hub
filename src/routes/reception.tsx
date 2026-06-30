@@ -620,7 +620,44 @@ function ReceptionEditForm({
               </select>
             </div>
           </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="editBroughtByDriver"
+                checked={broughtByDriver}
+                onChange={(e) => {
+                  setBroughtByDriver(e.target.checked);
+                  if (!e.target.checked) setDriverName("");
+                }}
+                className="h-4 w-4"
+              />
+              <label htmlFor="editBroughtByDriver" className="text-sm font-bold">
+                أحضرها سائق
+              </label>
+            </div>
+            {broughtByDriver ? (
+              <div>
+                <label className="mb-1 block text-xs font-bold">السائق *</label>
+                <select
+                  className={inputCls}
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  required={broughtByDriver}
+                >
+                  <option value="">اختر السائق</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                  {driverName && !drivers.some((d) => d.name === driverName) ? (
+                    <option value={driverName}>{driverName}</option>
+                  ) : null}
+                </select>
+              </div>
+            ) : null}
+          </div>
           <div>
+
             <label className="mb-1 block text-xs font-bold">ملاحظات (اختياري)</label>
             <textarea className={inputCls} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="أي ملاحظات…" />
           </div>
