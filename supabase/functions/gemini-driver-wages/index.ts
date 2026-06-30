@@ -11,8 +11,10 @@ const SYSTEM_PROMPT = `You are a logistics assistant for Ets. BINA'A, a construc
 
 Rules:
 - ciment_tonnes: total cement in TONNES. Recognize: طن/tone/tonne/tn + سيمان/ciment/سمنت + grade like 42/32/42.5/32.5/52.5. 1 sac of ciment = 0.05 tonne (1 tonne = 20 sacs).
+- SHORTHAND for cement: "<number> طن<grade>" or "<number> طن <grade>" where <grade> is a cement grade number (42, 32, 42.5, 32.5, 52.5, etc) directly attached to طن with NO mention of حديد/fer anywhere nearby — this means cement, even without the word سيمان/ciment explicitly written. Example: "2 طن42" means 2 tonnes of cement grade 42 → add 2 to ciment_tonnes.
 - barigs: total bariques (باريك/بريك/barig) of iron/fer/حديد. Count each barig as 1 unit regardless of fer type (fer 12, fer 10, fer 14, etc). 0.5 barig = 0.5.
-- fer_tonnes: iron in TONNES, ONLY if explicitly stated as طن حديد / tone fer / tonne fer. Do NOT convert barigs to tonnes here — keep them separate.
+- SHORTHAND for barigs: "<number> فير <size>" or "<number> فير<size>" — فير here is dialectal/French-derived slang for iron rebar bundles (NOT a unit of weight), so this ALWAYS means <number> barigs of iron, regardless of the size number that follows (e.g. fer 12, fer 10, fer 14, fer 8). Example: "2 فير 12" means 2 barigs of fer 12 → add 2 to barigs. Do NOT interpret this as tonnes.
+- fer_tonnes: iron in TONNES, ONLY if explicitly stated as طن حديد / tone fer / tonne fer (with the word طن, not فير). Do NOT convert barigs to tonnes here — keep them separate.
 - Sum the quantities across ALL order texts provided (they are separated by "---").
 - If a quantity type is not mentioned anywhere, return 0 for it.
 - Ignore all other materials: plaster (جبس/plater), gravel (حصى/gravier), sand (رمل/sable), water, bricks, etc.
@@ -35,6 +37,162 @@ function normalizeDigits(input: string) {
     .toLowerCase();
 }
 
+function roundQuantity(value: number) {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000;
+}
+
+function parseLocalQuantities(details: string): WageQuantities {
+  const text = normalizeDigits(details);
+  const number = "(\\d+(?:\\.\\d+)?)";
+  const tonUnit = "(?:طن|tons?|tonnes?|tn|t)";
+  const cementWord = "(?:سيمان|سمنت|اسمنت|ciment|cement)";
+  const sacUnit = "(?:sacs?|كيس|اكياس|أكياس)";
+  const ironWord = "(?:حديد|fer)";
+  const barigUnit = "(?:باريك(?:ات)?|بريك(?:ات)?|barigs?|bariques?|barriques?)";
+  const cementGrade = "(?:42(?:\\.5)?|32(?:\\.5)?|52\\.5)";
+  const ferShorthandWord = "(?:فير)";
+
+  let ciment_tonnes = 0;
+  let barigs = 0;
+  let fer_tonnes = 0;
+
+  const addMatches = (regex: RegExp, add: (value: number) => void) => {
+    for (const match of text.matchAll(regex)) {
+      const value = Number(match[1] ?? match[2] ?? 0);
+      if (Number.isFinite(value)) add(value);
+    }
+  };
+
+  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v));
+  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (ciment_tonnes += v));
+  addMatches(
+    new RegExp(`${number}\\s*${sacUnit}[^\n\r-]{0,35}${cementWord}`, "giu"),
+    (v) => (ciment_tonnes += v * 0.05),
+  );
+  addMatches(
+    new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${sacUnit}`, "giu"),
+    (v) => (ciment_tonnes += v * 0.05),
+  );
+  // Shorthand: "2 طن42" / "2 طن 42" with a cement grade directly attached, no سيمان word needed
+  addMatches(new RegExp(`${number}\\s*${tonUnit}\\s*${cementGrade}\\b`, "giu"), (v) => (ciment_tonnes += v));
+
+  addMatches(new RegExp(`${number}\\s*${barigUnit}(?:[^\n\r-]{0,35}${ironWord})?`, "giu"), (v) => (barigs += v));
+  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${barigUnit}`, "giu"), (v) => (barigs += v));
+  // Shorthand: "2 فير 12" / "2 فير12" always means barigs of iron, never tonnes
+  addMatches(new RegExp(`${number}\\s*${ferShorthandWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (barigs += v));
+
+  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${ironWord}`, "giu"), (v) => (fer_tonnes += v));
+  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (fer_tonnes += v));
+
+  return {
+    ciment_tonnes: roundQuantity(ciment_tonnes),
+    barigs: roundQuantity(barigs),
+    fer_tonnes: roundQuantity(fer_tonnes),
+  };
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { details } = await req.json().catch(() => ({ details: "" }));
+    const userText = (details ?? "").toString().trim();
+    if (!userText) {
+      return jsonResponse({ ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 });
+    }
+
+    const localFallback = parseLocalQuantities(userText);
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) {
+      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Gemini API key is not configured" });
+    }
+
+    const body = {
+      systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userText }] }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json",
+      },
+    };
+
+    const models = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
+    let resp: Response | null = null;
+    let raw = "";
+    let lastErr = "";
+    let lastStatus = 0;
+
+    outer: for (const model of models) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        raw = await resp.text();
+        if (resp.ok) break outer;
+        lastErr = raw;
+        lastStatus = resp.status;
+        console.error(`[gemini-driver-wages] ${model} attempt ${attempt + 1} HTTP ${resp.status}`);
+        if (resp.status !== 503 && resp.status !== 429 && resp.status !== 500) break;
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+
+    if (!resp || !resp.ok) {
+      let message = `Gemini API error ${lastStatus}`;
+      try {
+        const j = JSON.parse(lastErr);
+        message = j?.error?.message ?? message;
+      } catch {
+        /* ignore */
+      }
+      console.error(`[gemini-driver-wages] using local fallback: ${message}`);
+      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: message });
+    }
+
+    let data: any = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Invalid JSON from Gemini" });
+    }
+
+    const text: string = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
+    if (!text || !text.trim()) {
+      const finish = data?.candidates?.[0]?.finishReason ?? "unknown";
+      return jsonResponse({
+        ...localFallback,
+        fallback: "local-parser",
+        warning: `Empty response from Gemini (finishReason: ${finish})`,
+      });
+    }
+
+    const clean = text.replace(/```json|```/g, "").trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(clean);
+    } catch {
+      return jsonResponse({
+        ...localFallback,
+        fallback: "local-parser",
+        warning: "Could not parse Gemini JSON output",
+      });
+    }
+
+    return jsonResponse({
+      ciment_tonnes: Number(parsed.ciment_tonnes ?? 0),
+      barigs: Number(parsed.barigs ?? 0),
+      fer_tonnes: Number(parsed.fer_tonnes ?? 0),
+    });
+  } catch (e: any) {
+    console.error("[gemini-driver-wages] error", e);
+    return jsonResponse({ error: e?.message ?? "Unknown error" }, 500);
+  }
+});
 function roundQuantity(value: number) {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
