@@ -122,33 +122,6 @@ async function uploadAttachments(customerId: string, atts: LocalAttachments) {
   return { imagePaths, voicePath, filePaths };
 }
 
-const RIMSOFT_SYSTEM_PROMPT = `You are an assistant for Ets. BINA'A, a construction materials company in Mauritania. Analyze the order text and extract information, returning ONLY a valid JSON object with exactly these 3 keys, nothing else:
-{"libelle": "the chantier or location name found in the text, or empty string if none", "products": "the RIMSoft clipboard lines, one per product, format: CODE,DESIGNATION,0,QUANTITY,0", "phone": ""}
-
-For products, use this product list to match by code:
-P0001 CIMENT 42.5, P0002 CIMENT 32.5, P0003 CIMENT ANTISEL SR, P0003s CIMENT ANTISEL PM, P0004 PLATER MAMCO TAIBA, P0005 PLATER ATLANTIC, P0006 FILASSE, P0006s FILASSE PAR KG, P0007 FIL DE FER, P0008 POINTE, P0009 PLATER SAMIA, P052 PLATER SAMIA, P0010 ZAZOU L2 par kg, P0010s L4, P0010c ZAZOU par metre, P0011 FER 12 CHEMALI, P0012 FER 10 CHEMALI, P0013 FER 12 TURKEY, P0014 FER 10 TURKEY, P0015 FER 12 CHINE, P0016 FER 10 CHINE, P0017 FER 8, p01147 FER 8 Turkey, P0022 FER 14 CHEMALI, P0023 BAR 8, P0024 BRIQUE 15, P0024S BRIQUE 20 P, P0024SS BRIQUE 15P, P4141 BRIQUE 20 CRE, P0025 ORDI, P00301 BAR 10 TURKEY, P0027 BAR 14 CHEMALI, P0027S BAR 14 TURK, P0028 BAR 4.5, P0029 BAR 5.5, P0030 BAR 10 CHEMALI, p0032 CONTRE PLAC 8MM, P01a1 CONTRE PLAC 15, P0033 FER 12 ALGERIE, P0034 GRAVIER CRBLE PAR TONNE, P00341 GRAVIER CONCSER PAR TONNE, P0044 SABLE, P0045 COQUILLAGE, P0046 EAU, POO47 TUBE 9 INJELEC, P0048 TUBE 11 IJELEC, P0049 FER 4.2, P0050 FER 6 PLEIN, P05214 FER 5 PLEIN, P0051 FER 16, P0051s FER 16 ALG, P0512 FER 16 TURKEY, P0051B BAR 16, P0014Q FLICONT, P0014Q2 FLICONT 20 KG, P0020s FER 4.7, p0100 PLATR SOMIP, P0053 POINTE AC, P0055 ETANCHEITE TAPIS GUEDRON 3M, P0055S ETANCHEITE TAPIS GUEDRON 4MM, P0056 COLLE GUEDRON, P0057 FIL 1.5, P0058 FIL 2.5, P0060 SMCI 30KG, P0061 SMCI 25KG, P0062 SMCI 20KG, P0063 A L'HUIL SMCI 20KG, P0064 CARREAU, P0064S FER 20, P00152 BAR 20, P0065 CARREAU SOL, P055 CIMENT 52.5, P0066 COLORANT, p0125 CABLE 3X1.5, P00091 FER 14 ALGERIE, P00991t FER 14 TURKEY, P0014A FER 10 ALGERIE, P00992 FER 14 CHINE, P0339 CIMENT BLANC 25 KG, p00145 BAR 6 P, P001247 ENDUI, P001247s ENDUI GOLD, P02415 ENDUI SMCI, P0021s FER 4.5, P00524 BERWETT, P012S1 SURJOINT, P012S3 COFREE 24, P01C5 COFREE 12, p021145 CABLE 2X25, P0197 COLLE CARREAU MR, P0197S COLLE CARREAU TURQUE, P01121 COLLE GREFIER 30 KG ATLAS, p0124 PAPIER SABLE, P00143 BOITIER ROUGE, P00415 CABLE CUIVRE 4X16, P05241 PLANCHE MC, p01204 CHEVRON, P012004 DULIAN GM, P01210 DULIAN, P03214 PEL, PTRSP TRANSPORT, P0101 FER 12 MR, P02141 FER 10 MR, P10001 BACHE L'EAU 5 TN, P01354 BACHE 7/5, P013544 BACHE 6/5, P013544s BACHE 4/5, P01354sq BACHE 4/3, P02100 BACH 10TN, P101 SEAU MACON GM, P101S SEAU MACON M, P101SS SEAU MACON, P101SSS SEAU PLATER, p10241 SIKA 1KG, p10241s SIKA LIQUID 5L, P00991 TALOUCHE, 40026 BAR 12 CHEMALI, 40026S BAR 12 TURK, P0000 PRODUIT VIDE.
-
-DEFAULT RULES when origin/brand not specified:
-- FER 12 / حديد 12 without brand → P0011 FER 12 CHEMALI
-- FER 10 / حديد 10 without brand → P0012 FER 10 CHEMALI
-- FER 14 / حديد 14 without brand → P0022 FER 14 CHEMALI
-- PLATER / جبس without brand → P0005 PLATER ATLANTIC
-- CIMENT / سيمان without grade → P0001 CIMENT 42.5
-- GRAVIER / حصى without type → P0034 GRAVIER CRBLE PAR TONNE
-
-BRAND KEYWORDS:
-- شمالي / chemali → CHEMALI
-- تركي / turkey / turk → TURKEY
-- صيني / chine → CHINE
-- جزائري / algerie / alg → ALGERIE
-- أطلنتيك / atlantic → ATLANTIC
-- مامكو / mamco → MAMCO TAIBA
-- سامية / samia → SAMIA
-
-Unit conversions: 1 tonne = 10 bariques. 0.5 barique = half barique. sac stays as SAC. kg stays as KG.
-Do NOT include chantier or location name in products lines.
-Return ONLY the JSON object, no explanation, no markdown.`;
-
 export function OrdersList({ status }: { status: "active" | "archived" }) {
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
@@ -156,11 +129,6 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
   const notifyTelegram = useServerFn(sendTelegramOrderNotification);
-
-  // RIMSoft state
-  const [rimsoftOrder, setRimsoftOrder] = useState<Order | null>(null);
-  const [rimsoftLoading, setRimsoftLoading] = useState<string | null>(null);
-  const [rimsoftResult, setRimsoftResult] = useState<{ phone: string; libelle: string; products: string } | null>(null);
 
   const {
     data: orders = [],
@@ -234,31 +202,6 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
     onError: (e: any) => toast.error(e.message),
   });
 
-  async function handleRimsoft(o: Order) {
-    setRimsoftLoading(o.id);
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke("gemini-rimsoft", {
-        body: { details: o.details ?? "" },
-      });
-      if (fnError) throw fnError;
-      const text = data?.text ?? "";
-      const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
-      setRimsoftResult({
-        phone: o.customers?.phone ?? "",
-        libelle: parsed.libelle ?? "",
-        products: String(parsed.products ?? "")
-          .replace(/\r\n|\r/g, "\n")
-          .trim(),
-      });
-      setRimsoftOrder(o);
-    } catch (e: any) {
-      toast.error("فشل تحليل الطلب: " + (e?.message ?? "خطأ غير معروف"));
-    } finally {
-      setRimsoftLoading(null);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -286,84 +229,6 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
         }}
       >
         {editing && <OrderDialog initial={editing} onDone={() => setEditing(null)} />}
-      </Dialog>
-
-      {/* RIMSoft Dialog */}
-      <Dialog
-        open={!!rimsoftOrder}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRimsoftOrder(null);
-            setRimsoftResult(null);
-          }
-        }}
-      >
-        <DialogContent dir="rtl" className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>🧾 تحويل للمحاسبة — RIMSoft</DialogTitle>
-            <p className="text-sm text-muted-foreground">{rimsoftOrder?.customers?.name}</p>
-          </DialogHeader>
-          {rimsoftResult && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">📞 رقم الهاتف — Client</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-muted rounded px-3 py-2 text-sm font-mono" dir="ltr">
-                    {rimsoftResult.phone}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      navigator.clipboard.writeText(rimsoftResult.phone);
-                      toast.success("تم النسخ ✓");
-                    }}
-                  >
-                    نسخ
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">🏗️ Libellé — وصف الفاتورة</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-muted rounded px-3 py-2 text-sm">{rimsoftResult.libelle || "—"}</code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      navigator.clipboard.writeText(rimsoftResult.libelle);
-                      toast.success("تم النسخ ✓");
-                    }}
-                  >
-                    نسخ
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  📋 المنتجات — الصق في "Coller liste en mémoire"
-                </p>
-                <div className="flex flex-col gap-2">
-                  <pre className="bg-muted rounded px-3 py-2 text-sm font-mono whitespace-pre-wrap" dir="ltr">
-                    {rimsoftResult.products}
-                  </pre>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => {
-                      navigator.clipboard.writeText(rimsoftResult.products);
-                      toast.success("تم النسخ ✓");
-                    }}
-                  >
-                    نسخ المنتجات
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
       </Dialog>
 
       <div className="relative">
@@ -439,14 +304,6 @@ export function OrdersList({ status }: { status: "active" | "archived" }) {
               )}
               <OrderAttachmentsView images={o.images} voice={o.voice_note} files={o.files} />
               <div className="flex justify-end gap-2 pt-1">
-                <Button size="sm" variant="outline" disabled={rimsoftLoading === o.id} onClick={() => handleRimsoft(o)}>
-                  {rimsoftLoading === o.id ? (
-                    <span className="h-4 w-4 ml-1 animate-spin inline-block border-2 border-current border-t-transparent rounded-full" />
-                  ) : (
-                    <span className="ml-1">🧾</span>
-                  )}
-                  تحويل للمحاسبة
-                </Button>
                 {status === "active" && (
                   <Button
                     size="sm"
