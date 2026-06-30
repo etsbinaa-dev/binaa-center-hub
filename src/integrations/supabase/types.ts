@@ -277,7 +277,7 @@ export type Database = {
         }
         Relationships: []
       }
-      drivers: {
+  drivers: {
         Row: {
           barig_rate: number
           ciment_rate: number
@@ -285,6 +285,9 @@ export type Database = {
           fer_rate: number
           id: string
           name: string
+          reception_barig_rate: number
+          reception_ciment_rate: number
+          reception_fer_rate: number
         }
         Insert: {
           barig_rate?: number
@@ -293,6 +296,9 @@ export type Database = {
           fer_rate?: number
           id?: string
           name: string
+          reception_barig_rate?: number
+          reception_ciment_rate?: number
+          reception_fer_rate?: number
         }
         Update: {
           barig_rate?: number
@@ -301,6 +307,9 @@ export type Database = {
           fer_rate?: number
           id?: string
           name?: string
+          reception_barig_rate?: number
+          reception_ciment_rate?: number
+          reception_fer_rate?: number
         }
         Relationships: []
       }
