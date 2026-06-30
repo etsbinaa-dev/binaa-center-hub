@@ -29,7 +29,10 @@ type Row = {
   created_by_name: string | null;
   created_at: string;
   is_archived: boolean;
+  brought_by_driver?: boolean | null;
+  driver_name?: string | null;
 };
+
 
 type TabKind = "active" | "archive";
 
