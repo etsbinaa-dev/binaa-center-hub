@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 
-const DRIVERS = [
-  { name: "بكرن", rates: { ciment_tonne: 1200, barig: 100, fer_tonne: 1000 } },
-  { name: "الحسن", rates: { ciment_tonne: 1200, barig: 100, fer_tonne: 1000 } },
-  { name: "موناك", rates: { ciment_tonne: 1000, barig: 100, fer_tonne: 1000 } },
-];
+type Driver = {
+  id: string;
+  name: string;
+  ciment_rate: number;
+  barig_rate: number;
+  fer_rate: number;
+};
 
 type DriverOrder = { id: string; details: string };
 type DriverResult = {
@@ -42,11 +45,202 @@ async function analyzeOrders(
   };
 }
 
+function DriverForm({
+  initial,
+  onCancel,
+  onSave,
+  saving,
+}: {
+  initial?: Driver;
+  onCancel: () => void;
+  onSave: (values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number }) => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [ciment, setCiment] = useState(String(initial?.ciment_rate ?? ""));
+  const [barig, setBarig] = useState(String(initial?.barig_rate ?? ""));
+  const [fer, setFer] = useState(String(initial?.fer_rate ?? ""));
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <div className="space-y-1">
+        <Label htmlFor="drv-name">اسم السائق</Label>
+        <Input id="drv-name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="drv-ciment">سعر طن السيمان</Label>
+          <Input id="drv-ciment" type="number" value={ciment} onChange={(e) => setCiment(e.target.value)} dir="ltr" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drv-barig">سعر البريك</Label>
+          <Input id="drv-barig" type="number" value={barig} onChange={(e) => setBarig(e.target.value)} dir="ltr" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drv-fer">سعر طن الحديد</Label>
+          <Input id="drv-fer" type="number" value={fer} onChange={(e) => setFer(e.target.value)} dir="ltr" />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          disabled={saving || !name.trim()}
+          onClick={() =>
+            onSave({
+              name: name.trim(),
+              ciment_rate: Number(ciment) || 0,
+              barig_rate: Number(barig) || 0,
+              fer_rate: Number(fer) || 0,
+            })
+          }
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "حفظ"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel} disabled={saving}>
+          إلغاء
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DriversManager({
+  drivers,
+  loading,
+  onRefresh,
+}: {
+  drivers: Driver[];
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function handleAdd(values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number }) {
+    setSavingId("new");
+    const { error } = await supabase.from("drivers").insert(values);
+    setSavingId(null);
+    if (error) {
+      toast.error("فشل إضافة السائق: " + error.message);
+      return;
+    }
+    toast.success("تمت إضافة السائق");
+    setAdding(false);
+    onRefresh();
+  }
+
+  async function handleEdit(
+    id: string,
+    values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number },
+  ) {
+    setSavingId(id);
+    const { error } = await supabase.from("drivers").update(values).eq("id", id);
+    setSavingId(null);
+    if (error) {
+      toast.error("فشل تعديل السائق: " + error.message);
+      return;
+    }
+    toast.success("تم تحديث بيانات السائق");
+    setEditingId(null);
+    onRefresh();
+  }
+
+  async function handleDelete(driver: Driver) {
+    if (!window.confirm(`هل تريد حذف السائق "${driver.name}"؟`)) return;
+    setBusyId(driver.id);
+    const { error } = await supabase.from("drivers").delete().eq("id", driver.id);
+    setBusyId(null);
+    if (error) {
+      toast.error("فشل الحذف: " + error.message);
+      return;
+    }
+    toast.success("تم حذف السائق");
+    onRefresh();
+  }
+
+  return (
+    <Card className="p-4">
+      <button className="flex w-full items-center justify-between text-start" onClick={() => setOpen((o) => !o)}>
+        <h3 className="text-lg font-bold">إدارة السائقين</h3>
+        {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : (
+            drivers.map((d) =>
+              editingId === d.id ? (
+                <DriverForm
+                  key={d.id}
+                  initial={d}
+                  saving={savingId === d.id}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(values) => handleEdit(d.id, values)}
+                />
+              ) : (
+                <div key={d.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <div className="font-bold">{d.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      سيمان {d.ciment_rate.toLocaleString()} · بريك {d.barig_rate.toLocaleString()} · حديد{" "}
+                      {d.fer_rate.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="icon" variant="outline" onClick={() => setEditingId(d.id)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="outline" disabled={busyId === d.id} onClick={() => handleDelete(d)}>
+                      {busyId === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              ),
+            )
+          )}
+
+          {adding ? (
+            <DriverForm saving={savingId === "new"} onCancel={() => setAdding(false)} onSave={handleAdd} />
+          ) : (
+            <Button size="sm" onClick={() => setAdding(true)}>
+              إضافة سائق
+            </Button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function DriverWages() {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
   const [results, setResults] = useState<DriverResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(true);
+
+  async function loadDrivers() {
+    setDriversLoading(true);
+    const { data, error } = await supabase.from("drivers").select("*").order("created_at", { ascending: true });
+    setDriversLoading(false);
+    if (error) {
+      toast.error("فشل تحميل قائمة السائقين: " + error.message);
+      return;
+    }
+    setDrivers((data ?? []) as Driver[]);
+  }
+
+  useEffect(() => {
+    loadDrivers();
+  }, []);
 
   async function calculate() {
     setLoading(true);
@@ -66,7 +260,7 @@ export function DriverWages() {
 
       const driverResults: DriverResult[] = [];
 
-      for (const driver of DRIVERS) {
+      for (const driver of drivers) {
         const driverOrders: DriverOrder[] = (orders ?? [])
           .filter((o: any) => o.driver_name === driver.name)
           .map((o: any) => ({ id: o.id, details: o.details ?? "" }));
@@ -76,10 +270,16 @@ export function DriverWages() {
           quantities = await analyzeOrders(driverOrders);
         }
 
+        const rates = {
+          ciment_tonne: driver.ciment_rate,
+          barig: driver.barig_rate,
+          fer_tonne: driver.fer_rate,
+        };
+
         const total =
-          quantities.ciment_tonnes * driver.rates.ciment_tonne +
-          quantities.barigs * driver.rates.barig +
-          quantities.fer_tonnes * driver.rates.fer_tonne;
+          quantities.ciment_tonnes * rates.ciment_tonne +
+          quantities.barigs * rates.barig +
+          quantities.fer_tonnes * rates.fer_tonne;
 
         driverResults.push({
           name: driver.name,
@@ -87,7 +287,7 @@ export function DriverWages() {
           barigs: quantities.barigs,
           fer_tonnes: quantities.fer_tonnes,
           total,
-          rates: driver.rates,
+          rates,
           orders: driverOrders,
         });
       }
@@ -106,6 +306,8 @@ export function DriverWages() {
     <div dir="rtl" className="space-y-6">
       <h2 className="text-xl font-bold">مستحقات السائقين</h2>
 
+      <DriversManager drivers={drivers} loading={driversLoading} onRefresh={loadDrivers} />
+
       <div className="flex flex-wrap items-center gap-3">
         <Input
           type="date"
@@ -116,7 +318,7 @@ export function DriverWages() {
           lang="en"
           style={{ direction: "ltr", unicodeBidi: "isolate" }}
         />
-        <Button onClick={calculate} disabled={loading}>
+        <Button onClick={calculate} disabled={loading || driversLoading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           حساب
         </Button>
@@ -128,9 +330,7 @@ export function DriverWages() {
             <Card key={r.name} className="p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">{r.name}</h3>
-                <span className="text-sm text-muted-foreground">
-                  {r.orders.length} توصيلة
-                </span>
+                <span className="text-sm text-muted-foreground">{r.orders.length} توصيلة</span>
               </div>
 
               <div className="space-y-2 text-sm">
@@ -144,8 +344,7 @@ export function DriverWages() {
                 <div className="flex justify-between border-b border-border/40 pb-1">
                   <span>باريكات حديد</span>
                   <span>
-                    {r.barigs} × {r.rates.barig.toLocaleString()} ={" "}
-                    {(r.barigs * r.rates.barig).toLocaleString()}
+                    {r.barigs} × {r.rates.barig.toLocaleString()} = {(r.barigs * r.rates.barig).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-border/40 pb-1">
@@ -164,9 +363,7 @@ export function DriverWages() {
 
               {r.orders.length > 0 && (
                 <details className="text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">
-                    عرض التوصيلات ({r.orders.length})
-                  </summary>
+                  <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
                   <ul className="mt-2 space-y-1 ps-4">
                     {r.orders.map((o, i) => (
                       <li key={o.id}>
