@@ -89,11 +89,6 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      return jsonResponse({ error: "GEMINI_API_KEY is not configured" }, 500);
-    }
-
     const { details } = await req.json().catch(() => ({ details: "" }));
     const userText = (details ?? "").toString().trim();
     if (!userText) {
@@ -101,6 +96,10 @@ serve(async (req) => {
     }
 
     const localFallback = parseLocalQuantities(userText);
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) {
+      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Gemini API key is not configured" });
+    }
 
     const body = {
       systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
@@ -111,7 +110,7 @@ serve(async (req) => {
       },
     };
 
-    const models = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+    const models = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let resp: Response | null = null;
     let raw = "";
     let lastErr = "";
