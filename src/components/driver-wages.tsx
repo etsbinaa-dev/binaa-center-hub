@@ -13,23 +13,55 @@ type Driver = {
   ciment_rate: number;
   barig_rate: number;
   fer_rate: number;
+  reception_ciment_rate: number;
+  reception_barig_rate: number;
+  reception_fer_rate: number;
+};
+
+type DriverFormValues = {
+  name: string;
+  ciment_rate: number;
+  barig_rate: number;
+  fer_rate: number;
+  reception_ciment_rate: number;
+  reception_barig_rate: number;
+  reception_fer_rate: number;
 };
 
 type DriverOrder = { id: string; details: string };
+type ReceptionItem = {
+  id: string;
+  supplier: string;
+  goods_type: string;
+  quantity: number;
+  unit: string;
+  created_at: string;
+};
+
 type DriverResult = {
   name: string;
   ciment_tonnes: number;
   barigs: number;
   fer_tonnes: number;
-  total: number;
-  rates: { ciment_tonne: number; barig: number; fer_tonne: number };
+  deliveryRates: { ciment_tonne: number; barig: number; fer_tonne: number };
+  deliveryTotal: number;
   orders: DriverOrder[];
+  recCiment: number;
+  recBarigs: number;
+  recFer: number;
+  receptionRates: { ciment_tonne: number; barig: number; fer_tonne: number };
+  receptionTotal: number;
+  receptions: ReceptionItem[];
+  total: number;
 };
 
 async function analyzeOrders(
   orders: DriverOrder[],
 ): Promise<{ ciment_tonnes: number; barigs: number; fer_tonnes: number }> {
-  const combined = orders.map((o) => o.details).filter(Boolean).join("\n---\n");
+  const combined = orders
+    .map((o) => o.details)
+    .filter(Boolean)
+    .join("\n---\n");
   if (!combined.trim()) return { ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 };
 
   const { data, error } = await supabase.functions.invoke("gemini-driver-wages", {
@@ -45,6 +77,18 @@ async function analyzeOrders(
   };
 }
 
+function classifyReception(r: ReceptionItem): { ciment: number; barig: number; fer: number } {
+  const qty = Number(r.quantity) || 0;
+  const goods = (r.goods_type || "").trim();
+  if (r.unit === "قطعة") {
+    return { ciment: 0, barig: qty, fer: 0 };
+  }
+  if (goods.includes("سيمان") || goods.includes("اسمنت") || goods.includes("إسمنت")) {
+    return { ciment: qty, barig: 0, fer: 0 };
+  }
+  return { ciment: 0, barig: 0, fer: qty };
+}
+
 function DriverForm({
   initial,
   onCancel,
@@ -53,13 +97,16 @@ function DriverForm({
 }: {
   initial?: Driver;
   onCancel: () => void;
-  onSave: (values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number }) => void;
+  onSave: (values: DriverFormValues) => void;
   saving: boolean;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [ciment, setCiment] = useState(String(initial?.ciment_rate ?? ""));
   const [barig, setBarig] = useState(String(initial?.barig_rate ?? ""));
   const [fer, setFer] = useState(String(initial?.fer_rate ?? ""));
+  const [recCiment, setRecCiment] = useState(String(initial?.reception_ciment_rate ?? ""));
+  const [recBarig, setRecBarig] = useState(String(initial?.reception_barig_rate ?? ""));
+  const [recFer, setRecFer] = useState(String(initial?.reception_fer_rate ?? ""));
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
@@ -67,6 +114,8 @@ function DriverForm({
         <Label htmlFor="drv-name">اسم السائق</Label>
         <Input id="drv-name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
+
+      <div className="text-xs font-bold text-muted-foreground">أسعار التوصيل (للعميل)</div>
       <div className="grid grid-cols-3 gap-2">
         <div className="space-y-1">
           <Label htmlFor="drv-ciment">سعر طن السيمان</Label>
@@ -81,6 +130,43 @@ function DriverForm({
           <Input id="drv-fer" type="number" value={fer} onChange={(e) => setFer(e.target.value)} dir="ltr" />
         </div>
       </div>
+
+      <div className="border-t border-border pt-3">
+        <div className="mb-1 text-xs font-bold text-muted-foreground">أسعار الاستقبال (من المورد)</div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-ciment">سعر طن السيمان</Label>
+            <Input
+              id="drv-rec-ciment"
+              type="number"
+              value={recCiment}
+              onChange={(e) => setRecCiment(e.target.value)}
+              dir="ltr"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-barig">سعر القطعة</Label>
+            <Input
+              id="drv-rec-barig"
+              type="number"
+              value={recBarig}
+              onChange={(e) => setRecBarig(e.target.value)}
+              dir="ltr"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-fer">سعر طن الحديد</Label>
+            <Input
+              id="drv-rec-fer"
+              type="number"
+              value={recFer}
+              onChange={(e) => setRecFer(e.target.value)}
+              dir="ltr"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <Button
           size="sm"
@@ -91,6 +177,9 @@ function DriverForm({
               ciment_rate: Number(ciment) || 0,
               barig_rate: Number(barig) || 0,
               fer_rate: Number(fer) || 0,
+              reception_ciment_rate: Number(recCiment) || 0,
+              reception_barig_rate: Number(recBarig) || 0,
+              reception_fer_rate: Number(recFer) || 0,
             })
           }
         >
@@ -119,7 +208,7 @@ function DriversManager({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function handleAdd(values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number }) {
+  async function handleAdd(values: DriverFormValues) {
     setSavingId("new");
     const { error } = await supabase.from("drivers").insert(values);
     setSavingId(null);
@@ -132,10 +221,7 @@ function DriversManager({
     onRefresh();
   }
 
-  async function handleEdit(
-    id: string,
-    values: { name: string; ciment_rate: number; barig_rate: number; fer_rate: number },
-  ) {
+  async function handleEdit(id: string, values: DriverFormValues) {
     setSavingId(id);
     const { error } = await supabase.from("drivers").update(values).eq("id", id);
     setSavingId(null);
@@ -189,8 +275,12 @@ function DriversManager({
                   <div>
                     <div className="font-bold">{d.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      سيمان {d.ciment_rate.toLocaleString()} · بريك {d.barig_rate.toLocaleString()} · حديد{" "}
+                      توصيل: سيمان {d.ciment_rate.toLocaleString()} · بريك {d.barig_rate.toLocaleString()} · حديد{" "}
                       {d.fer_rate.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      استقبال: سيمان {d.reception_ciment_rate.toLocaleString()} · قطعة{" "}
+                      {d.reception_barig_rate.toLocaleString()} · حديد {d.reception_fer_rate.toLocaleString()}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -258,6 +348,15 @@ export function DriverWages() {
 
       if (error) throw error;
 
+      const { data: receptions, error: recError } = await supabase
+        .from("receptions")
+        .select("id, supplier, goods_type, quantity, unit, driver_name, created_at")
+        .eq("brought_by_driver", true)
+        .gte("created_at", startOfDay)
+        .lte("created_at", endOfDay);
+
+      if (recError) throw recError;
+
       const driverResults: DriverResult[] = [];
 
       for (const driver of drivers) {
@@ -270,25 +369,64 @@ export function DriverWages() {
           quantities = await analyzeOrders(driverOrders);
         }
 
-        const rates = {
+        const deliveryRates = {
           ciment_tonne: driver.ciment_rate,
           barig: driver.barig_rate,
           fer_tonne: driver.fer_rate,
         };
 
-        const total =
-          quantities.ciment_tonnes * rates.ciment_tonne +
-          quantities.barigs * rates.barig +
-          quantities.fer_tonnes * rates.fer_tonne;
+        const deliveryTotal =
+          quantities.ciment_tonnes * deliveryRates.ciment_tonne +
+          quantities.barigs * deliveryRates.barig +
+          quantities.fer_tonnes * deliveryRates.fer_tonne;
+
+        const driverReceptions: ReceptionItem[] = (receptions ?? [])
+          .filter((r: any) => r.driver_name === driver.name)
+          .map((r: any) => ({
+            id: r.id,
+            supplier: r.supplier,
+            goods_type: r.goods_type,
+            quantity: Number(r.quantity) || 0,
+            unit: r.unit,
+            created_at: r.created_at,
+          }));
+
+        let recCiment = 0;
+        let recBarigs = 0;
+        let recFer = 0;
+        for (const r of driverReceptions) {
+          const c = classifyReception(r);
+          recCiment += c.ciment;
+          recBarigs += c.barig;
+          recFer += c.fer;
+        }
+
+        const receptionRates = {
+          ciment_tonne: driver.reception_ciment_rate,
+          barig: driver.reception_barig_rate,
+          fer_tonne: driver.reception_fer_rate,
+        };
+
+        const receptionTotal =
+          recCiment * receptionRates.ciment_tonne +
+          recBarigs * receptionRates.barig +
+          recFer * receptionRates.fer_tonne;
 
         driverResults.push({
           name: driver.name,
           ciment_tonnes: quantities.ciment_tonnes,
           barigs: quantities.barigs,
           fer_tonnes: quantities.fer_tonnes,
-          total,
-          rates,
+          deliveryRates,
+          deliveryTotal,
           orders: driverOrders,
+          recCiment,
+          recBarigs,
+          recFer,
+          receptionRates,
+          receptionTotal,
+          receptions: driverReceptions,
+          total: deliveryTotal + receptionTotal,
         });
       }
 
@@ -330,49 +468,103 @@ export function DriverWages() {
             <Card key={r.name} className="p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">{r.name}</h3>
-                <span className="text-sm text-muted-foreground">{r.orders.length} توصيلة</span>
+                <span className="text-sm text-muted-foreground">
+                  {r.orders.length} توصيلة · {r.receptions.length} استقبال
+                </span>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b border-border/40 pb-1">
-                  <span>سيمان</span>
-                  <span>
-                    {r.ciment_tonnes} طن × {r.rates.ciment_tonne.toLocaleString()} ={" "}
-                    {(r.ciment_tonnes * r.rates.ciment_tonne).toLocaleString()}
-                  </span>
+              <div className="space-y-2 rounded-lg border border-border/60 p-3">
+                <div className="text-sm font-bold">التوصيل</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>سيمان</span>
+                    <span>
+                      {r.ciment_tonnes} طن × {r.deliveryRates.ciment_tonne.toLocaleString()} ={" "}
+                      {(r.ciment_tonnes * r.deliveryRates.ciment_tonne).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>باريكات حديد</span>
+                    <span>
+                      {r.barigs} × {r.deliveryRates.barig.toLocaleString()} ={" "}
+                      {(r.barigs * r.deliveryRates.barig).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>حديد (طن)</span>
+                    <span>
+                      {r.fer_tonnes} طن × {r.deliveryRates.fer_tonne.toLocaleString()} ={" "}
+                      {(r.fer_tonnes * r.deliveryRates.fer_tonne).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between border-b border-border/40 pb-1">
-                  <span>باريكات حديد</span>
-                  <span>
-                    {r.barigs} × {r.rates.barig.toLocaleString()} = {(r.barigs * r.rates.barig).toLocaleString()}
-                  </span>
+                <div className="flex justify-between text-sm font-bold">
+                  <span>مجموع التوصيل</span>
+                  <span>{r.deliveryTotal.toLocaleString()} MRO</span>
                 </div>
-                <div className="flex justify-between border-b border-border/40 pb-1">
-                  <span>حديد (طن)</span>
-                  <span>
-                    {r.fer_tonnes} طن × {r.rates.fer_tonne.toLocaleString()} ={" "}
-                    {(r.fer_tonnes * r.rates.fer_tonne).toLocaleString()}
-                  </span>
+
+                {r.orders.length > 0 && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
+                    <ul className="mt-2 space-y-1 ps-4">
+                      {r.orders.map((o, i) => (
+                        <li key={o.id}>
+                          {i + 1}. {o.details?.slice(0, 80)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border/60 p-3">
+                <div className="text-sm font-bold">الاستقبال (من المورد)</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>سيمان</span>
+                    <span>
+                      {r.recCiment} طن × {r.receptionRates.ciment_tonne.toLocaleString()} ={" "}
+                      {(r.recCiment * r.receptionRates.ciment_tonne).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>قطع</span>
+                    <span>
+                      {r.recBarigs} × {r.receptionRates.barig.toLocaleString()} ={" "}
+                      {(r.recBarigs * r.receptionRates.barig).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>حديد (طن)</span>
+                    <span>
+                      {r.recFer} طن × {r.receptionRates.fer_tonne.toLocaleString()} ={" "}
+                      {(r.recFer * r.receptionRates.fer_tonne).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
+                <div className="flex justify-between text-sm font-bold">
+                  <span>مجموع الاستقبال</span>
+                  <span>{r.receptionTotal.toLocaleString()} MRO</span>
+                </div>
+
+                {r.receptions.length > 0 && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">عرض الاستقبالات ({r.receptions.length})</summary>
+                    <ul className="mt-2 space-y-1 ps-4">
+                      {r.receptions.map((rec, i) => (
+                        <li key={rec.id}>
+                          {i + 1}. {rec.supplier} — {rec.goods_type} — {rec.quantity} {rec.unit}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
 
               <div className="flex justify-between rounded-lg bg-primary/10 p-3 font-bold">
-                <span>المجموع</span>
+                <span>المجموع الكلي للسائق</span>
                 <span>{r.total.toLocaleString()} MRO</span>
               </div>
-
-              {r.orders.length > 0 && (
-                <details className="text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
-                  <ul className="mt-2 space-y-1 ps-4">
-                    {r.orders.map((o, i) => (
-                      <li key={o.id}>
-                        {i + 1}. {o.details?.slice(0, 80)}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
             </Card>
           ))}
 
