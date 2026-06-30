@@ -113,6 +113,8 @@ export function DriverWages() {
           onChange={(e) => setDate(e.target.value)}
           className="w-48"
           dir="ltr"
+          lang="en"
+          style={{ direction: "ltr", unicodeBidi: "isolate" }}
         />
         <Button onClick={calculate} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
