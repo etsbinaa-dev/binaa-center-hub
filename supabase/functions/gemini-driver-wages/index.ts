@@ -59,16 +59,22 @@ function parseLocalQuantities(details: string): WageQuantities {
     }
   };
 
-  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => ciment_tonnes += v);
-  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => ciment_tonnes += v);
-  addMatches(new RegExp(`${number}\\s*${sacUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => ciment_tonnes += v * 0.05);
-  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${sacUnit}`, "giu"), (v) => ciment_tonnes += v * 0.05);
+  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v));
+  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (ciment_tonnes += v));
+  addMatches(
+    new RegExp(`${number}\\s*${sacUnit}[^\n\r-]{0,35}${cementWord}`, "giu"),
+    (v) => (ciment_tonnes += v * 0.05),
+  );
+  addMatches(
+    new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${sacUnit}`, "giu"),
+    (v) => (ciment_tonnes += v * 0.05),
+  );
 
-  addMatches(new RegExp(`${number}\\s*${barigUnit}(?:[^\n\r-]{0,35}${ironWord})?`, "giu"), (v) => barigs += v);
-  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${barigUnit}`, "giu"), (v) => barigs += v);
+  addMatches(new RegExp(`${number}\\s*${barigUnit}(?:[^\n\r-]{0,35}${ironWord})?`, "giu"), (v) => (barigs += v));
+  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${barigUnit}`, "giu"), (v) => (barigs += v));
 
-  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${ironWord}`, "giu"), (v) => fer_tonnes += v);
-  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => fer_tonnes += v);
+  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${ironWord}`, "giu"), (v) => (fer_tonnes += v));
+  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (fer_tonnes += v));
 
   return {
     ciment_tonnes: roundQuantity(ciment_tonnes),
@@ -105,7 +111,7 @@ serve(async (req) => {
       },
     };
 
-    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+    const models = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
     let resp: Response | null = null;
     let raw = "";
     let lastErr = "";
@@ -134,11 +140,12 @@ serve(async (req) => {
       try {
         const j = JSON.parse(lastErr);
         message = j?.error?.message ?? message;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       console.error(`[gemini-driver-wages] using local fallback: ${message}`);
       return jsonResponse({ ...localFallback, fallback: "local-parser", warning: message });
     }
-
 
     let data: any = null;
     try {
@@ -150,7 +157,11 @@ serve(async (req) => {
     const text: string = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
     if (!text || !text.trim()) {
       const finish = data?.candidates?.[0]?.finishReason ?? "unknown";
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: `Empty response from Gemini (finishReason: ${finish})` });
+      return jsonResponse({
+        ...localFallback,
+        fallback: "local-parser",
+        warning: `Empty response from Gemini (finishReason: ${finish})`,
+      });
     }
 
     const clean = text.replace(/```json|```/g, "").trim();
@@ -158,7 +169,11 @@ serve(async (req) => {
     try {
       parsed = JSON.parse(clean);
     } catch {
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Could not parse Gemini JSON output" });
+      return jsonResponse({
+        ...localFallback,
+        fallback: "local-parser",
+        warning: "Could not parse Gemini JSON output",
+      });
     }
 
     return jsonResponse({
