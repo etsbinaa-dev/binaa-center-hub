@@ -16,6 +16,7 @@ Rules:
 - IMPORTANT: "1 طن فير 12" or "1 tn fer 12" = 1 tonne of iron (fer_tonnes), NOT barigs.
 - fer_tonnes: iron in TONNES. Explicit "طن حديد" or "tonne fer" or "طن فير 12" (with طن before فير).
 - IGNORE: بلاتر/plater, تانشتي/tachinti, فليكونت/flycont, كول كرو/coulcro, فيلاص/vilas — these are handled separately.
+- Also IGNORE these words after numbers (they describe iron TYPE not quantity, do NOT count as barigs): تركي, ابوينت, فيل دتاش, صيني, تام, 3مم, دتاش, بونت, chinois, pointe, vildatach
 - Sum all order texts (separated by ---). Return 0 if not mentioned.
 - Numbers may be Arabic-Indic or Latin.
 Return ONLY the JSON object, no explanation, no markdown, no code fences.`;
