@@ -195,7 +195,7 @@ export function DeliveryList({ view }: { view: "active" | "archive" }) {
                   </div>
                 </div>
                 {o.details && o.details.trim() && (
-                  <p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2" dir="auto">
+<p className="text-sm whitespace-pre-wrap bg-muted/50 rounded-md p-2" dir="auto" style={{ textAlign: "start", unicodeBidi: "plaintext" }}>
                     {o.details}
                   </p>
                 )}
