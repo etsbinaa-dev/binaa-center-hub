@@ -10,15 +10,14 @@ const SYSTEM_PROMPT = `You are a logistics assistant for Ets. BINA'A, a construc
 {"ciment_tonnes": number, "barigs": number, "fer_tonnes": number}
 
 Rules:
-- ciment_tonnes: total cement in TONNES. Recognize: طن/tone/tonne/tn + سيمان/ciment/سمنت + grade like 42/32/42.5/32.5/52.5. 1 sac of ciment = 0.05 tonne (1 tonne = 20 sacs).
-- SHORTHAND for cement: "<number> طن<grade>" or "<number> طن <grade>" or "<number> tn<grade>" or "<number> tn <grade>" where <grade> is a cement grade number (42, 32, 42.5, 32.5, 52.5) — means cement even without سيمان/ciment written. Example: "2 tn42" or "2 طن42" = 2 tonnes cement.
-- barigs: total bariques (باريك/بريك/barig) of iron. Count each barig as 1 unit regardless of size.
-- SHORTHAND for barigs: "<number> فير <size>" or "<number> fer <size>" (Arabic or French/Latin) — ALWAYS means <number> barigs of iron. Example: "3 fer 12" = 3 barigs, "2 فير 10" = 2 barigs. Do NOT interpret as tonnes.
-- fer_tonnes: iron in TONNES ONLY if explicitly stated as طن حديد / tonne fer with the word طن/tonne (NOT فير/fer shorthand).
-- Sum quantities across ALL order texts (separated by "---").
-- Return 0 for any type not mentioned.
-- Ignore: plaster (جبس/plater), gravel (حصى/gravier), sand (رمل/sable), water, bricks, etc.
-- Numbers may be Arabic-Indic or Latin digits.
+- ciment_tonnes: total cement in TONNES. Recognize: طن/tonne/tn + سيمان/ciment/سمنت + grade like 42/32/42.5/32.5/52.5. 1 sac = 0.05 tonne.
+- SHORTHAND cement: "2 طن42" or "2 tn42" or "2 طن 42" or "2 tn 42" = cement even without سيمان/ciment word.
+- barigs: total bariques of iron. "2 فير 12" or "2 fer 12" = 2 barigs. Count only when NOT preceded by طن/tn.
+- IMPORTANT: "1 طن فير 12" or "1 tn fer 12" = 1 tonne of iron (fer_tonnes), NOT barigs, because طن/tn precedes فير/fer.
+- fer_tonnes: iron in TONNES. Explicit "طن حديد" or "tonne fer" or "طن فير 12" (with طن before فير).
+- Sum all order texts (separated by ---). Return 0 if not mentioned.
+- Ignore: plaster, gravel, sand, water, bricks, tachinti, blater, etc.
+- Numbers may be Arabic-Indic or Latin.
 Return ONLY the JSON object, no explanation, no markdown, no code fences.`;
 
 function jsonResponse(body: unknown, status = 200) {
@@ -44,13 +43,13 @@ function roundQuantity(value: number) {
 function parseLocalQuantities(details: string): WageQuantities {
   const text = normalizeDigits(details);
   const number = "(\\d+(?:\\.\\d+)?)";
-  const tonUnit = "(?:طن|tons?|tonnes?|tn)";
+  const tonUnit = "(?:طن|tonnes?|tn)";
   const cementWord = "(?:سيمان|سمنت|اسمنت|ciment|cement)";
   const sacUnit = "(?:sacs?|كيس|اكياس|أكياس)";
-  const ironWord = "(?:حديد|fer)";
+  const ironWord = "(?:حديد)";
   const barigUnit = "(?:باريك(?:ات)?|بريك(?:ات)?|barigs?|bariques?|barriques?)";
   const cementGrade = "(?:42(?:\\.5)?|32(?:\\.5)?|52\\.5)";
-  const ferShorthandWord = "(?:فير|fer)";
+  const ferWord = "(?:فير|fer)";
 
   let ciment_tonnes = 0;
   let barigs = 0;
@@ -63,18 +62,25 @@ function parseLocalQuantities(details: string): WageQuantities {
     }
   };
 
+  // Cement: explicit word
   addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v));
   addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (ciment_tonnes += v));
   addMatches(new RegExp(`${number}\\s*${sacUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v * 0.05));
   addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${sacUnit}`, "giu"), (v) => (ciment_tonnes += v * 0.05));
+  // Cement shorthand: "2 طن42" or "2 tn42"
   addMatches(new RegExp(`${number}\\s*${tonUnit}\\s*${cementGrade}\\b`, "giu"), (v) => (ciment_tonnes += v));
 
+  // Barigs: explicit unit
   addMatches(new RegExp(`${number}\\s*${barigUnit}(?:[^\n\r-]{0,35}${ironWord})?`, "giu"), (v) => (barigs += v));
   addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${barigUnit}`, "giu"), (v) => (barigs += v));
-  addMatches(new RegExp(`${number}\\s*${ferShorthandWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (barigs += v));
+  // Barigs shorthand: "2 فير 12" or "2 fer 12" (only when NOT preceded by طن/tn)
+  addMatches(new RegExp(`(?<!${tonUnit}\\s{0,5})${number}\\s*${ferWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (barigs += v));
 
+  // Iron tonnes: explicit "طن حديد"
   addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${ironWord}`, "giu"), (v) => (fer_tonnes += v));
   addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (fer_tonnes += v));
+  // Iron tonnes shorthand: "1 طن فير 12" or "1 tn fer 12"
+  addMatches(new RegExp(`${number}\\s*${tonUnit}\\s*${ferWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (fer_tonnes += v));
 
   return {
     ciment_tonnes: roundQuantity(ciment_tonnes),
