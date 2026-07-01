@@ -313,6 +313,33 @@ export type Database = {
         }
         Relationships: []
       }
+      extra_materials: {
+        Row: {
+          created_at: string
+          id: string
+          keywords: string[]
+          name: string
+          price_tonne: number
+          price_unit: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          name: string
+          price_tonne?: number
+          price_unit?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          name?: string
+          price_tonne?: number
+          price_unit?: number
+        }
+        Relationships: []
+      }
       house_cash_ops: {
         Row: {
           amount: number
