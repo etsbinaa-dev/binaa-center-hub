@@ -1,173 +1,437 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json",
+type Driver = {
+  id: string;
+  name: string;
+  ciment_rate: number;
+  barig_rate: number;
+  fer_rate: number;
+  reception_ciment_rate: number;
+  reception_barig_rate: number;
+  reception_fer_rate: number;
 };
 
-const SYSTEM_PROMPT = `You are a logistics assistant for Ets. BINA'A, a construction materials company in Mauritania. Analyze ALL the delivery order texts (separated by ---) and extract TOTAL combined quantities, returning ONLY a valid JSON object with exactly these 3 keys:
-{"ciment_tonnes": number, "barigs": number, "fer_tonnes": number}
+type DriverFormValues = {
+  name: string;
+  ciment_rate: number;
+  barig_rate: number;
+  fer_rate: number;
+  reception_ciment_rate: number;
+  reception_barig_rate: number;
+  reception_fer_rate: number;
+};
 
-Rules:
-- ciment_tonnes: total cement in TONNES. Recognize: طن/tonne/tn + سيمان/ciment/سمنت + grade like 42/32/42.5/32.5/52.5. 1 sac = 0.05 tonne.
-- SHORTHAND cement: "2 طن42" or "2 tn42" or "2 طن 42" or "2 tn 42" = cement even without سيمان/ciment word.
-- barigs: total bariques of iron. "2 فير 12" or "2 fer 12" = 2 barigs. Count only when NOT preceded by طن/tn.
-- IMPORTANT: "1 طن فير 12" or "1 tn fer 12" = 1 tonne of iron (fer_tonnes), NOT barigs, because طن/tn precedes فير/fer.
-- fer_tonnes: iron in TONNES. Explicit "طن حديد" or "tonne fer" or "طن فير 12" (with طن before فير).
-- Sum all order texts (separated by ---). Return 0 if not mentioned.
-- Ignore: plaster, gravel, sand, water, bricks, tachinti, blater, etc.
-- Numbers may be Arabic-Indic or Latin.
-Return ONLY the JSON object, no explanation, no markdown, no code fences.`;
+type DriverOrder = { id: string; details: string };
+type ReceptionItem = {
+  id: string;
+  supplier: string;
+  goods_type: string;
+  quantity: number;
+  unit: string;
+  created_at: string;
+};
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
-}
+type DriverResult = {
+  name: string;
+  ciment_tonnes: number;
+  barigs: number;
+  fer_tonnes: number;
+  deliveryRates: { ciment_tonne: number; barig: number; fer_tonne: number };
+  deliveryTotal: number;
+  orders: DriverOrder[];
+  recCiment: number;
+  recBarigs: number;
+  recFer: number;
+  receptionRates: { ciment_tonne: number; barig: number; fer_tonne: number };
+  receptionTotal: number;
+  receptions: ReceptionItem[];
+  total: number;
+};
 
-type WageQuantities = { ciment_tonnes: number; barigs: number; fer_tonnes: number };
+async function analyzeOrders(
+  orders: DriverOrder[],
+): Promise<{ ciment_tonnes: number; barigs: number; fer_tonnes: number }> {
+  const combined = orders.map((o) => o.details).filter(Boolean).join("\n---\n");
+  if (!combined.trim()) return { ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 };
 
-function normalizeDigits(input: string) {
-  const arabic = "٠١٢٣٤٥٦٧٨٩";
-  const persian = "۰۱۲۳۴۵۶۷۸۹";
-  return input
-    .replace(/[٠-٩]/g, (d) => String(arabic.indexOf(d)))
-    .replace(/[۰-۹]/g, (d) => String(persian.indexOf(d)))
-    .replace(/[,،]/g, ".")
-    .toLowerCase();
-}
-
-function roundQuantity(value: number) {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000;
-}
-
-function parseLocalQuantities(details: string): WageQuantities {
-  const text = normalizeDigits(details);
-  const number = "(\\d+(?:\\.\\d+)?)";
-  const tonUnit = "(?:طن|tonnes?|tn)";
-  const cementWord = "(?:سيمان|سمنت|اسمنت|ciment|cement)";
-  const sacUnit = "(?:sacs?|كيس|اكياس|أكياس)";
-  const ironWord = "(?:حديد)";
-  const barigUnit = "(?:باريك(?:ات)?|بريك(?:ات)?|barigs?|bariques?|barriques?)";
-  const cementGrade = "(?:42(?:\\.5)?|32(?:\\.5)?|52\\.5)";
-  const ferWord = "(?:فير|fer)";
-
-  let ciment_tonnes = 0;
-  let barigs = 0;
-  let fer_tonnes = 0;
-
-  const addMatches = (regex: RegExp, add: (value: number) => void) => {
-    for (const match of text.matchAll(regex)) {
-      const value = Number(match[1] ?? match[2] ?? 0);
-      if (Number.isFinite(value)) add(value);
-    }
-  };
-
-  // Cement: explicit word
-  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v));
-  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (ciment_tonnes += v));
-  addMatches(new RegExp(`${number}\\s*${sacUnit}[^\n\r-]{0,35}${cementWord}`, "giu"), (v) => (ciment_tonnes += v * 0.05));
-  addMatches(new RegExp(`${cementWord}[^\n\r-]{0,35}${number}\\s*${sacUnit}`, "giu"), (v) => (ciment_tonnes += v * 0.05));
-  // Cement shorthand: "2 طن42" or "2 tn42"
-  addMatches(new RegExp(`${number}\\s*${tonUnit}\\s*${cementGrade}\\b`, "giu"), (v) => (ciment_tonnes += v));
-
-  // Barigs: explicit unit
-  addMatches(new RegExp(`${number}\\s*${barigUnit}(?:[^\n\r-]{0,35}${ironWord})?`, "giu"), (v) => (barigs += v));
-  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${barigUnit}`, "giu"), (v) => (barigs += v));
-  // Barigs shorthand: "2 فير 12" or "2 fer 12" (only when NOT preceded by طن/tn)
-  addMatches(new RegExp(`(?<!${tonUnit}\\s{0,5})${number}\\s*${ferWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (barigs += v));
-
-  // Iron tonnes: explicit "طن حديد"
-  addMatches(new RegExp(`${number}\\s*${tonUnit}[^\n\r-]{0,35}${ironWord}`, "giu"), (v) => (fer_tonnes += v));
-  addMatches(new RegExp(`${ironWord}[^\n\r-]{0,35}${number}\\s*${tonUnit}`, "giu"), (v) => (fer_tonnes += v));
-  // Iron tonnes shorthand: "1 طن فير 12" or "1 tn fer 12"
-  addMatches(new RegExp(`${number}\\s*${tonUnit}\\s*${ferWord}\\s*\\d+(?:\\.\\d+)?`, "giu"), (v) => (fer_tonnes += v));
+  const { data, error } = await supabase.functions.invoke("gemini-driver-wages", {
+    body: { details: combined },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
 
   return {
-    ciment_tonnes: roundQuantity(ciment_tonnes),
-    barigs: roundQuantity(barigs),
-    fer_tonnes: roundQuantity(fer_tonnes),
+    ciment_tonnes: Number(data?.ciment_tonnes ?? 0),
+    barigs: Number(data?.barigs ?? 0),
+    fer_tonnes: Number(data?.fer_tonnes ?? 0),
   };
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+function classifyReception(r: ReceptionItem): { ciment: number; barig: number; fer: number } {
+  const qty = Number(r.quantity) || 0;
+  const goods = (r.goods_type || "").trim();
+  if (r.unit === "قطعة") return { ciment: 0, barig: qty, fer: 0 };
+  if (goods.includes("سيمان") || goods.includes("اسمنت") || goods.includes("إسمنت")) {
+    return { ciment: qty, barig: 0, fer: 0 };
+  }
+  return { ciment: 0, barig: 0, fer: qty };
+}
+
+function DriverForm({
+  initial, onCancel, onSave, saving,
+}: {
+  initial?: Driver;
+  onCancel: () => void;
+  onSave: (values: DriverFormValues) => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [ciment, setCiment] = useState(String(initial?.ciment_rate ?? ""));
+  const [barig, setBarig] = useState(String(initial?.barig_rate ?? ""));
+  const [fer, setFer] = useState(String(initial?.fer_rate ?? ""));
+  const [recCiment, setRecCiment] = useState(String(initial?.reception_ciment_rate ?? ""));
+  const [recBarig, setRecBarig] = useState(String(initial?.reception_barig_rate ?? ""));
+  const [recFer, setRecFer] = useState(String(initial?.reception_fer_rate ?? ""));
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <div className="space-y-1">
+        <Label htmlFor="drv-name">اسم السائق</Label>
+        <Input id="drv-name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="text-xs font-bold text-muted-foreground">أسعار التوصيل (للعميل)</div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="drv-ciment">سعر طن السيمان</Label>
+          <Input id="drv-ciment" type="number" value={ciment} onChange={(e) => setCiment(e.target.value)} dir="ltr" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drv-barig">سعر البريك</Label>
+          <Input id="drv-barig" type="number" value={barig} onChange={(e) => setBarig(e.target.value)} dir="ltr" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="drv-fer">سعر طن الحديد</Label>
+          <Input id="drv-fer" type="number" value={fer} onChange={(e) => setFer(e.target.value)} dir="ltr" />
+        </div>
+      </div>
+      <div className="border-t border-border pt-3">
+        <div className="mb-1 text-xs font-bold text-muted-foreground">أسعار الاستقبال (من المورد)</div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-ciment">سعر طن السيمان</Label>
+            <Input id="drv-rec-ciment" type="number" value={recCiment} onChange={(e) => setRecCiment(e.target.value)} dir="ltr" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-barig">سعر القطعة</Label>
+            <Input id="drv-rec-barig" type="number" value={recBarig} onChange={(e) => setRecBarig(e.target.value)} dir="ltr" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="drv-rec-fer">سعر طن الحديد</Label>
+            <Input id="drv-rec-fer" type="number" value={recFer} onChange={(e) => setRecFer(e.target.value)} dir="ltr" />
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          disabled={saving || !name.trim()}
+          onClick={() => onSave({
+            name: name.trim(),
+            ciment_rate: Number(ciment) || 0,
+            barig_rate: Number(barig) || 0,
+            fer_rate: Number(fer) || 0,
+            reception_ciment_rate: Number(recCiment) || 0,
+            reception_barig_rate: Number(recBarig) || 0,
+            reception_fer_rate: Number(recFer) || 0,
+          })}
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "حفظ"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel} disabled={saving}>إلغاء</Button>
+      </div>
+    </div>
+  );
+}
+
+function DriversManager({ drivers, loading, onRefresh }: {
+  drivers: Driver[];
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function handleAdd(values: DriverFormValues) {
+    setSavingId("new");
+    const { error } = await supabase.from("drivers").insert(values);
+    setSavingId(null);
+    if (error) { toast.error("فشل إضافة السائق: " + error.message); return; }
+    toast.success("تمت إضافة السائق");
+    setAdding(false);
+    onRefresh();
   }
 
-  try {
-    const { details } = await req.json().catch(() => ({ details: "" }));
-    const userText = (details ?? "").toString().trim();
-    if (!userText) {
-      return jsonResponse({ ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 });
-    }
+  async function handleEdit(id: string, values: DriverFormValues) {
+    setSavingId(id);
+    const { error } = await supabase.from("drivers").update(values).eq("id", id);
+    setSavingId(null);
+    if (error) { toast.error("فشل تعديل السائق: " + error.message); return; }
+    toast.success("تم تحديث بيانات السائق");
+    setEditingId(null);
+    onRefresh();
+  }
 
-    const localFallback = parseLocalQuantities(userText);
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Gemini API key is not configured" });
-    }
+  async function handleDelete(driver: Driver) {
+    if (!window.confirm(`هل تريد حذف السائق "${driver.name}"؟`)) return;
+    setBusyId(driver.id);
+    const { error } = await supabase.from("drivers").delete().eq("id", driver.id);
+    setBusyId(null);
+    if (error) { toast.error("فشل الحذف: " + error.message); return; }
+    toast.success("تم حذف السائق");
+    onRefresh();
+  }
 
-    const body = {
-      systemInstruction: { role: "system", parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: "user", parts: [{ text: userText }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
-    };
+  return (
+    <Card className="p-4">
+      <button className="flex w-full items-center justify-between text-start" onClick={() => setOpen((o) => !o)}>
+        <h3 className="text-lg font-bold">إدارة السائقين</h3>
+        {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+      </button>
+      {open && (
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : (
+            drivers.map((d) =>
+              editingId === d.id ? (
+                <DriverForm key={d.id} initial={d} saving={savingId === d.id}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(values) => handleEdit(d.id, values)} />
+              ) : (
+                <div key={d.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <div className="font-bold">{d.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      توصيل: سيمان {d.ciment_rate.toLocaleString()} · بريك {d.barig_rate.toLocaleString()} · حديد {d.fer_rate.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      استقبال: سيمان {d.reception_ciment_rate.toLocaleString()} · قطعة {d.reception_barig_rate.toLocaleString()} · حديد {d.reception_fer_rate.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="icon" variant="outline" onClick={() => setEditingId(d.id)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="outline" disabled={busyId === d.id} onClick={() => handleDelete(d)}>
+                      {busyId === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )
+            )
+          )}
+          {adding ? (
+            <DriverForm saving={savingId === "new"} onCancel={() => setAdding(false)} onSave={handleAdd} />
+          ) : (
+            <Button size="sm" onClick={() => setAdding(true)}>إضافة سائق</Button>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
 
-    const models = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
-    let resp: Response | null = null;
-    let raw = "";
-    let lastErr = "";
-    let lastStatus = 0;
+export function DriverWages() {
+  const today = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(today);
+  const [results, setResults] = useState<DriverResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(true);
 
-    outer: for (const model of models) {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        raw = await resp.text();
-        if (resp.ok) break outer;
-        lastErr = raw;
-        lastStatus = resp.status;
-        console.error(`[gemini-driver-wages] ${model} attempt ${attempt + 1} HTTP ${resp.status}`);
-        if (resp.status !== 503 && resp.status !== 429 && resp.status !== 500) break;
-        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+  async function loadDrivers() {
+    setDriversLoading(true);
+    const { data, error } = await supabase.from("drivers").select("*").order("created_at", { ascending: true });
+    setDriversLoading(false);
+    if (error) { toast.error("فشل تحميل قائمة السائقين: " + error.message); return; }
+    setDrivers((data ?? []) as Driver[]);
+  }
+
+  useEffect(() => { loadDrivers(); }, []);
+
+  async function calculate() {
+    setLoading(true);
+    setResults([]);
+    try {
+      const startOfDay = `${date}T00:00:00.000Z`;
+      const endOfDay = `${date}T23:59:59.999Z`;
+
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("id, details, driver_name, delivered_at, created_at")
+        .eq("delivery_status", "delivered")
+        .gte("delivered_at", startOfDay)
+        .lte("delivered_at", endOfDay);
+      if (error) throw error;
+
+      const { data: receptions, error: recError } = await supabase
+        .from("receptions")
+        .select("id, supplier, goods_type, quantity, unit, driver_name, created_at")
+        .eq("brought_by_driver", true)
+        .gte("created_at", startOfDay)
+        .lte("created_at", endOfDay);
+      if (recError) throw recError;
+
+      const driverResults: DriverResult[] = [];
+
+      for (const driver of drivers) {
+        const driverOrders: DriverOrder[] = (orders ?? [])
+          .filter((o: any) => o.driver_name === driver.name)
+          .map((o: any) => ({ id: o.id, details: o.details ?? "" }));
+
+        let quantities = { ciment_tonnes: 0, barigs: 0, fer_tonnes: 0 };
+        if (driverOrders.length > 0) quantities = await analyzeOrders(driverOrders);
+
+        const deliveryRates = { ciment_tonne: driver.ciment_rate, barig: driver.barig_rate, fer_tonne: driver.fer_rate };
+        const deliveryTotal =
+          quantities.ciment_tonnes * deliveryRates.ciment_tonne +
+          quantities.barigs * deliveryRates.barig +
+          quantities.fer_tonnes * deliveryRates.fer_tonne;
+
+        const driverReceptions: ReceptionItem[] = (receptions ?? [])
+          .filter((r: any) => r.driver_name === driver.name)
+          .map((r: any) => ({ id: r.id, supplier: r.supplier, goods_type: r.goods_type, quantity: Number(r.quantity) || 0, unit: r.unit, created_at: r.created_at }));
+
+        let recCiment = 0, recBarigs = 0, recFer = 0;
+        for (const r of driverReceptions) {
+          const c = classifyReception(r);
+          recCiment += c.ciment; recBarigs += c.barig; recFer += c.fer;
+        }
+
+        const receptionRates = { ciment_tonne: driver.reception_ciment_rate, barig: driver.reception_barig_rate, fer_tonne: driver.reception_fer_rate };
+        const receptionTotal = recCiment * receptionRates.ciment_tonne + recBarigs * receptionRates.barig + recFer * receptionRates.fer_tonne;
+
+        driverResults.push({ name: driver.name, ciment_tonnes: quantities.ciment_tonnes, barigs: quantities.barigs, fer_tonnes: quantities.fer_tonnes, deliveryRates, deliveryTotal, orders: driverOrders, recCiment, recBarigs, recFer, receptionRates, receptionTotal, receptions: driverReceptions, total: deliveryTotal + receptionTotal });
       }
+      setResults(driverResults);
+    } catch (e: any) {
+      toast.error("فشل الحساب: " + (e?.message ?? "خطأ"));
+    } finally {
+      setLoading(false);
     }
-
-    if (!resp || !resp.ok) {
-      let message = `Gemini API error ${lastStatus}`;
-      try { const j = JSON.parse(lastErr); message = j?.error?.message ?? message; } catch { }
-      console.error(`[gemini-driver-wages] using local fallback: ${message}`);
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: message });
-    }
-
-    let data: any = null;
-    try { data = JSON.parse(raw); } catch {
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Invalid JSON from Gemini" });
-    }
-
-    const text: string = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("") ?? "";
-    if (!text || !text.trim()) {
-      const finish = data?.candidates?.[0]?.finishReason ?? "unknown";
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: `Empty response from Gemini (finishReason: ${finish})` });
-    }
-
-    const clean = text.replace(/```json|```/g, "").trim();
-    let parsed: any;
-    try { parsed = JSON.parse(clean); } catch {
-      return jsonResponse({ ...localFallback, fallback: "local-parser", warning: "Could not parse Gemini JSON output" });
-    }
-
-    return jsonResponse({
-      ciment_tonnes: Number(parsed.ciment_tonnes ?? 0),
-      barigs: Number(parsed.barigs ?? 0),
-      fer_tonnes: Number(parsed.fer_tonnes ?? 0),
-    });
-  } catch (e: any) {
-    console.error("[gemini-driver-wages] error", e);
-    return jsonResponse({ error: e?.message ?? "Unknown error" }, 500);
   }
-});
+
+  const grandTotal = results.reduce((sum, r) => sum + r.total, 0);
+
+  return (
+    <div dir="rtl" className="space-y-6">
+      <h2 className="text-xl font-bold">مستحقات السائقين</h2>
+      <DriversManager drivers={drivers} loading={driversLoading} onRefresh={loadDrivers} />
+      <div className="flex flex-wrap items-center gap-3">
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-48" dir="ltr" lang="en" style={{ direction: "ltr", unicodeBidi: "isolate" }} />
+        <Button onClick={calculate} disabled={loading || driversLoading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          حساب
+        </Button>
+      </div>
+
+      {results.length > 0 && (
+        <div className="space-y-4">
+          {results.map((r) => (
+            <Card key={r.name} className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">{r.name}</h3>
+                <span className="text-sm text-muted-foreground">{r.orders.length} توصيلة · {r.receptions.length} استقبال</span>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border/60 p-3">
+                <div className="text-sm font-bold">التوصيل</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>سيمان</span>
+                    <span dir="ltr">{r.ciment_tonnes} طن × {r.deliveryRates.ciment_tonne.toLocaleString()} = {(r.ciment_tonnes * r.deliveryRates.ciment_tonne).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>باريكات حديد</span>
+                    <span dir="ltr">{r.barigs} × {r.deliveryRates.barig.toLocaleString()} = {(r.barigs * r.deliveryRates.barig).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>حديد (طن)</span>
+                    <span dir="ltr">{r.fer_tonnes} طن × {r.deliveryRates.fer_tonne.toLocaleString()} = {(r.fer_tonnes * r.deliveryRates.fer_tonne).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-sm font-bold">
+                  <span>مجموع التوصيل</span>
+                  <span dir="ltr">{r.deliveryTotal.toLocaleString()} MRO</span>
+                </div>
+                {r.orders.length > 0 && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
+                    <ul className="mt-2 space-y-1 ps-4">
+                      {r.orders.map((o, i) => (
+                        <li key={o.id} dir="auto">{i + 1}. {o.details?.slice(0, 100)}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border/60 p-3">
+                <div className="text-sm font-bold">الاستقبال (من المورد)</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>سيمان</span>
+                    <span dir="ltr">{r.recCiment} طن × {r.receptionRates.ciment_tonne.toLocaleString()} = {(r.recCiment * r.receptionRates.ciment_tonne).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>قطع</span>
+                    <span dir="ltr">{r.recBarigs} × {r.receptionRates.barig.toLocaleString()} = {(r.recBarigs * r.receptionRates.barig).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/40 pb-1">
+                    <span>حديد (طن)</span>
+                    <span dir="ltr">{r.recFer} طن × {r.receptionRates.fer_tonne.toLocaleString()} = {(r.recFer * r.receptionRates.fer_tonne).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-sm font-bold">
+                  <span>مجموع الاستقبال</span>
+                  <span dir="ltr">{r.receptionTotal.toLocaleString()} MRO</span>
+                </div>
+                {r.receptions.length > 0 && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">عرض الاستقبالات ({r.receptions.length})</summary>
+                    <ul className="mt-2 space-y-1 ps-4">
+                      {r.receptions.map((rec, i) => (
+                        <li key={rec.id} dir="auto">{i + 1}. {rec.supplier} — {rec.goods_type} — {rec.quantity} {rec.unit}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+
+              <div className="flex justify-between rounded-lg bg-primary/10 p-3 font-bold">
+                <span>المجموع الكلي للسائق</span>
+                <span dir="ltr">{r.total.toLocaleString()} MRO</span>
+              </div>
+            </Card>
+          ))}
+          <Card className="p-4 bg-primary text-primary-foreground">
+            <div className="flex justify-between text-lg font-bold">
+              <span>المجموع الكلي</span>
+              <span dir="ltr">{grandTotal.toLocaleString()} MRO</span>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
