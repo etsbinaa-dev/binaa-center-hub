@@ -277,7 +277,7 @@ export type Database = {
         }
         Relationships: []
       }
-  drivers: {
+      drivers: {
         Row: {
           barig_rate: number
           ciment_rate: number
