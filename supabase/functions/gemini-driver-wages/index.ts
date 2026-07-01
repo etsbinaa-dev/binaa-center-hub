@@ -11,14 +11,14 @@ const SYSTEM_PROMPT = `You are a logistics assistant for Ets. BINA'A, a construc
 
 Rules:
 - ciment_tonnes: total cement in TONNES. Recognize: طن/tone/tonne/tn + سيمان/ciment/سمنت + grade like 42/32/42.5/32.5/52.5. 1 sac of ciment = 0.05 tonne (1 tonne = 20 sacs).
-- SHORTHAND for cement: "<number> طن<grade>" or "<number> طن <grade>" where <grade> is a cement grade number (42, 32, 42.5, 32.5, 52.5, etc) directly attached to طن with NO mention of حديد/fer anywhere nearby — this means cement, even without the word سيمان/ciment explicitly written. Example: "2 طن42" means 2 tonnes of cement grade 42 → add 2 to ciment_tonnes.
-- barigs: total bariques (باريك/بريك/barig) of iron/fer/حديد. Count each barig as 1 unit regardless of fer type (fer 12, fer 10, fer 14, etc). 0.5 barig = 0.5.
-- SHORTHAND for barigs: "<number> فير <size>" or "<number> فير<size>" — فير here is dialectal/French-derived slang for iron rebar bundles (NOT a unit of weight), so this ALWAYS means <number> barigs of iron, regardless of the size number that follows (e.g. fer 12, fer 10, fer 14, fer 8). Example: "2 فير 12" means 2 barigs of fer 12 → add 2 to barigs. Do NOT interpret this as tonnes.
-- fer_tonnes: iron in TONNES, ONLY if explicitly stated as طن حديد / tone fer / tonne fer (with the word طن, not فير). Do NOT convert barigs to tonnes here — keep them separate.
-- Sum the quantities across ALL order texts provided (they are separated by "---").
-- If a quantity type is not mentioned anywhere, return 0 for it.
-- Ignore all other materials: plaster (جبس/plater), gravel (حصى/gravier), sand (رمل/sable), water, bricks, etc.
-- Numbers may be written in Arabic-Indic or Latin digits; handle both.
+- SHORTHAND for cement: "<number> طن<grade>" or "<number> طن <grade>" or "<number> tn<grade>" or "<number> tn <grade>" where <grade> is a cement grade number (42, 32, 42.5, 32.5, 52.5) — means cement even without سيمان/ciment written. Example: "2 tn42" or "2 طن42" = 2 tonnes cement.
+- barigs: total bariques (باريك/بريك/barig) of iron. Count each barig as 1 unit regardless of size.
+- SHORTHAND for barigs: "<number> فير <size>" or "<number> fer <size>" (Arabic or French/Latin) — ALWAYS means <number> barigs of iron. Example: "3 fer 12" = 3 barigs, "2 فير 10" = 2 barigs. Do NOT interpret as tonnes.
+- fer_tonnes: iron in TONNES ONLY if explicitly stated as طن حديد / tonne fer with the word طن/tonne (NOT فير/fer shorthand).
+- Sum quantities across ALL order texts (separated by "---").
+- Return 0 for any type not mentioned.
+- Ignore: plaster (جبس/plater), gravel (حصى/gravier), sand (رمل/sable), water, bricks, etc.
+- Numbers may be Arabic-Indic or Latin digits.
 Return ONLY the JSON object, no explanation, no markdown, no code fences.`;
 
 function jsonResponse(body: unknown, status = 200) {
@@ -44,13 +44,13 @@ function roundQuantity(value: number) {
 function parseLocalQuantities(details: string): WageQuantities {
   const text = normalizeDigits(details);
   const number = "(\\d+(?:\\.\\d+)?)";
-  const tonUnit = "(?:طن|tons?|tonnes?|tn|t)";
+  const tonUnit = "(?:طن|tons?|tonnes?|tn)";
   const cementWord = "(?:سيمان|سمنت|اسمنت|ciment|cement)";
   const sacUnit = "(?:sacs?|كيس|اكياس|أكياس)";
   const ironWord = "(?:حديد|fer)";
   const barigUnit = "(?:باريك(?:ات)?|بريك(?:ات)?|barigs?|bariques?|barriques?)";
   const cementGrade = "(?:42(?:\\.5)?|32(?:\\.5)?|52\\.5)";
-  const ferShorthandWord = "(?:فير)";
+  const ferShorthandWord = "(?:فير|fer)";
 
   let ciment_tonnes = 0;
   let barigs = 0;
