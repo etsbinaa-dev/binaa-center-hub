@@ -47,7 +47,8 @@ function ReportsView() {
     queryFn: () => fetchReports({ data: { range } }),
   });
 
-  const cards: { key: keyof NonNullable<typeof data>; label: string; icon: LucideIcon }[] = [
+  type CardKey = "newOrders" | "archivedOrders" | "invoicedOrders" | "unsentInvoices" | "sentInvoices" | "activeDeliveries" | "deliveredToday" | "totalCustomers" | "activeUsers";
+  const cards: { key: CardKey; label: string; icon: LucideIcon }[] = [
     { key: "newOrders", label: "طلبات جديدة", icon: ClipboardList },
     { key: "archivedOrders", label: "طلبات مؤرشفة", icon: Archive },
     { key: "invoicedOrders", label: "طلبات مفوترة", icon: Receipt },
