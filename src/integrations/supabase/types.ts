@@ -274,32 +274,6 @@ export type Database = {
           reviewed_by_name?: string | null
           status?: string
           updated_at?: string
-        }  
-        Relationships: []
-      }extra_materials: {
-        Row: {
-          created_at: string
-          id: string
-          keywords: string[]
-          name: string
-          price_tonne: number
-          price_unit: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          keywords?: string[]
-          name: string
-          price_tonne?: number
-          price_unit?: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          keywords?: string[]
-          name?: string
-          price_tonne?: number
-          price_unit?: number
         }
         Relationships: []
       }
