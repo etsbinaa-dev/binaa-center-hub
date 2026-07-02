@@ -455,7 +455,7 @@ export function DriverWages() {
                 {r.orders.length > 0 && (
                   <details className="text-xs text-muted-foreground">
                     <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
-                    <ul className="mt-2 space-y-1 ps-4">{r.orders.map((o, i) => <li key={o.id} dir="auto">{i + 1}. {o.details?.slice(0, 100)}</li>)}</ul>
+                    <ul className="mt-2 space-y-1 ps-4">{r.orders.map((o, i) => <li key={o.id} style={{ direction: "ltr", textAlign: "left" }}>{i + 1}. {o.details?.slice(0, 100)}</li>)}</ul>
                   </details>
                 )}
               </div>
