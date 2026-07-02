@@ -129,7 +129,7 @@ function getExtrasFromGemini(result: GeminiResult, materials: ExtraMaterial[]): 
     if (!keys) continue;
     const isSameKey = keys.tonnesKey === keys.unitsKey;
     const tonnes = isSameKey ? 0 : Number(result[keys.tonnesKey] ?? 0);
-    const units = isSameKey ? Number(result[keys.unitsKey] ?? 0) : Number(result[keys.unitsKey] ?? 0);
+    const units = Number(result[keys.unitsKey] ?? 0);
     const total = tonnes * mat.price_tonne + units * mat.price_unit;
     if (total > 0 || tonnes > 0 || units > 0) {
       extras.push({ material: mat, tonnes, units, total });
@@ -441,9 +441,10 @@ export function DriverWages() {
             <Card key={r.name} className="p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold">{r.name}</h3>
-                <span className="text-sm text-muted-foreground">{r.orders.length} توصيلة · {r.receptions.length} استقبال</span>
+                <span className="text-sm text-muted-foreground">{r.orders.length} توصيلة</span>
               </div>
 
+              {/* التوصيل */}
               <div className="space-y-2 rounded-lg border border-border/60 p-3">
                 <div className="text-sm font-bold">التوصيل</div>
                 <div className="space-y-2 text-sm">
@@ -455,27 +456,37 @@ export function DriverWages() {
                 {r.orders.length > 0 && (
                   <details className="text-xs text-muted-foreground">
                     <summary className="cursor-pointer">عرض التوصيلات ({r.orders.length})</summary>
-                    <ul className="mt-2 space-y-1 ps-4">{r.orders.map((o, i) => <li key={o.id} style={{ direction: "ltr", textAlign: "left" }}>{i + 1}. {o.details?.slice(0, 100)}</li>)}</ul>
+                    <ul className="mt-2 space-y-1 ps-4">
+                      {r.orders.map((o, i) => <li key={o.id} style={{ direction: "ltr", textAlign: "left" }}>{i + 1}. {o.details?.slice(0, 100)}</li>)}
+                    </ul>
                   </details>
                 )}
               </div>
 
-              <div className="space-y-2 rounded-lg border border-border/60 p-3">
-                <div className="text-sm font-bold">الاستقبال (من المورد)</div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between border-b border-border/40 pb-1"><span>سيمان</span><span dir="ltr">{r.recCiment} طن × {r.receptionRates.ciment_tonne.toLocaleString()} = {(r.recCiment * r.receptionRates.ciment_tonne).toLocaleString()}</span></div>
-                  <div className="flex justify-between border-b border-border/40 pb-1"><span>قطع</span><span dir="ltr">{r.recBarigs} × {r.receptionRates.barig.toLocaleString()} = {(r.recBarigs * r.receptionRates.barig).toLocaleString()}</span></div>
-                  <div className="flex justify-between border-b border-border/40 pb-1"><span>حديد (طن)</span><span dir="ltr">{r.recFer} طن × {r.receptionRates.fer_tonne.toLocaleString()} = {(r.recFer * r.receptionRates.fer_tonne).toLocaleString()}</span></div>
-                </div>
-                <div className="flex justify-between text-sm font-bold"><span>مجموع الاستقبال</span><span dir="ltr">{r.receptionTotal.toLocaleString()} MRO</span></div>
-                {r.receptions.length > 0 && (
-                  <details className="text-xs text-muted-foreground">
-                    <summary className="cursor-pointer">عرض الاستقبالات ({r.receptions.length})</summary>
-                    <ul className="mt-2 space-y-1 ps-4">{r.receptions.map((rec, i) => <li key={rec.id} dir="auto">{i + 1}. {rec.supplier} — {rec.goods_type} — {rec.quantity} {rec.unit}</li>)}</ul>
-                  </details>
-                )}
-              </div>
+              {/* الاستقبال — مطوي افتراضياً */}
+              {(r.recCiment > 0 || r.recBarigs > 0 || r.recFer > 0 || r.receptions.length > 0) && (
+                <details className="rounded-lg border border-border/60">
+                  <summary className="cursor-pointer p-3 text-sm font-bold list-none flex justify-between items-center">
+                    <span>الاستقبال (من المورد)</span>
+                    {r.receptionTotal > 0 && <span dir="ltr" className="text-muted-foreground font-normal">{r.receptionTotal.toLocaleString()} MRO</span>}
+                  </summary>
+                  <div className="space-y-2 p-3 pt-0">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between border-b border-border/40 pb-1"><span>سيمان</span><span dir="ltr">{r.recCiment} طن × {r.receptionRates.ciment_tonne.toLocaleString()} = {(r.recCiment * r.receptionRates.ciment_tonne).toLocaleString()}</span></div>
+                      <div className="flex justify-between border-b border-border/40 pb-1"><span>قطع</span><span dir="ltr">{r.recBarigs} × {r.receptionRates.barig.toLocaleString()} = {(r.recBarigs * r.receptionRates.barig).toLocaleString()}</span></div>
+                      <div className="flex justify-between border-b border-border/40 pb-1"><span>حديد (طن)</span><span dir="ltr">{r.recFer} طن × {r.receptionRates.fer_tonne.toLocaleString()} = {(r.recFer * r.receptionRates.fer_tonne).toLocaleString()}</span></div>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold"><span>مجموع الاستقبال</span><span dir="ltr">{r.receptionTotal.toLocaleString()} MRO</span></div>
+                    {r.receptions.length > 0 && (
+                      <ul className="mt-2 space-y-1 ps-4 text-xs text-muted-foreground">
+                        {r.receptions.map((rec, i) => <li key={rec.id} style={{ direction: "ltr", textAlign: "left" }}>{i + 1}. {rec.supplier} — {rec.goods_type} — {rec.quantity} {rec.unit}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                </details>
+              )}
 
+              {/* المواد الإضافية */}
               {r.extras.length > 0 && (
                 <div className="space-y-2 rounded-lg border border-border/60 p-3">
                   <div className="text-sm font-bold">مواد إضافية</div>
